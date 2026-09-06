@@ -1077,18 +1077,20 @@ function attachTaskGestures() {
     const id = wrap.dataset.id;
     const card = wrap.querySelector('.task-card');
     const delBg = wrap.querySelector('.task-delete-bg');
-    let x0=0, y0=0, dragging=false, longTimer=null, longFired=false, isTouch=false;
+    let x0=0, y0=0, dragging=false, moved=false, longTimer=null, longFired=false, isTouch=false;
 
     const start = (e) => {
       const pt = e.touches ? e.touches[0] : e;
-      x0 = pt.clientX; y0 = pt.clientY; dragging = false; longFired = false;
+      x0 = pt.clientX; y0 = pt.clientY; dragging = false; moved = false; longFired = false;
       longTimer = setTimeout(() => { longFired = true; openTaskActions(id); }, 550);
     };
     const move = (e) => {
       const pt = e.touches ? e.touches[0] : e;
       const dx = pt.clientX - x0, dy = pt.clientY - y0;
-      if (Math.abs(dx) > 10 || Math.abs(dy) > 10) clearTimeout(longTimer);
-      if (Math.abs(dx) > Math.abs(dy) && dx < 0) {
+      // Any real movement (in any direction) cancels the long-press timer
+      if (Math.abs(dx) > 10 || Math.abs(dy) > 10) { clearTimeout(longTimer); moved = true; }
+      // Only treat as a horizontal swipe if horizontal motion clearly dominates vertical motion
+      if (Math.abs(dx) > Math.abs(dy) * 1.5 && dx < 0) {
         dragging = true;
         const clamped = Math.max(dx,-84);
         card.style.transform = `translateX(${clamped}px)`;
@@ -1108,16 +1110,21 @@ function attachTaskGestures() {
         return;
       }
       if (longFired) { longFired = false; return; }
+      // The finger moved (e.g. scrolling the page vertically) but it wasn't
+      // classified as a horizontal swipe — do NOT toggle the task in that case.
+      if (moved) { return; }
       if (wrap.classList.contains('open')) {
         card.style.transform='translateX(0)'; delBg.style.transform='translateX(0)';
         wrap.classList.remove('open'); return;
       }
       toggleTaskDone(id);
     };
+    const cancel = () => { clearTimeout(longTimer); dragging = false; };
 
     card.addEventListener('touchstart', e => { isTouch=true; start(e); }, {passive:true});
     card.addEventListener('touchmove', move, {passive:true});
     card.addEventListener('touchend', e => { end(e); setTimeout(()=>isTouch=false,400); });
+    card.addEventListener('touchcancel', cancel);
     card.addEventListener('mousedown', e => { if(!isTouch) start(e); });
     card.addEventListener('mousemove', e => { if (!isTouch && e.buttons===1) move(e); });
     card.addEventListener('mouseup', e => { if(!isTouch) end(e); });
