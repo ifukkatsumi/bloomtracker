@@ -111,6 +111,20 @@ html, body {
 }
 .all-tasks-link:active { transform: scale(0.96); }
 
+/* Reorder list */
+.reorder-row { display: flex; align-items: center; justify-content: space-between; padding: 12px 4px; border-bottom: 1px solid rgba(244,114,168,0.12); }
+.reorder-row:last-child { border-bottom: none; }
+.reorder-label { font-size: 14px; font-weight: 500; color: var(--text1); flex: 1; min-width: 0; padding-right: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.reorder-btns { display: flex; gap: 6px; flex-shrink: 0; }
+.reorder-btn {
+  width: 32px; height: 32px; border-radius: 10px;
+  border: 1.5px solid rgba(244,114,168,0.25);
+  background: rgba(255,255,255,0.7); color: var(--pink-mid);
+  font-size: 14px; cursor: pointer; transition: transform .13s;
+}
+.reorder-btn:disabled { opacity: 0.3; cursor: default; }
+.reorder-btn:active:not(:disabled) { transform: scale(0.88); }
+
 /* ─── Scroll content ─── */
 .scroll {
   flex: 1; overflow-y: auto; overflow-x: hidden;
@@ -183,6 +197,7 @@ html, body {
   padding: 16px; display: flex; align-items: center; gap: 14px;
   cursor: pointer; transition: transform .15s;
   position: relative; overflow: hidden;
+  -webkit-user-select: none; -webkit-touch-callout: none; user-select: none;
 }
 .habit-card::before { content:''; position:absolute; left:0; top:0; bottom:0; width:4px; background:var(--grad-tab); border-radius:4px 0 0 4px; opacity:0; transition:opacity .2s; }
 .habit-card.done::before { opacity: 1; }
@@ -255,7 +270,7 @@ html, body {
   box-shadow: 0 3px 16px rgba(180,80,130,0.07);
   padding: 14px 16px; display: flex; align-items: center; gap: 12px;
   cursor: pointer; transition: transform .18s ease;
-  will-change: transform; -webkit-user-select: none;
+  will-change: transform; -webkit-user-select: none; -webkit-touch-callout: none; user-select: none;
 }
 .task-card.urgent { border-color: rgba(255,120,60,0.4); }
 .tc-check {
@@ -494,10 +509,6 @@ html, body {
       <div id="habits-content"></div>
     </div>
     <div class="sec" id="sec-tasks">
-      <div class="add-task-bar" id="add-task-bar">
-        <span class="atb-text">Добавить задачу</span>
-        <button class="atb-plus" id="atb-plus"><span class="plus-icon"></span></button>
-      </div>
       <div id="tasks-content"></div>
     </div>
   </div>
@@ -554,7 +565,7 @@ html, body {
    <input class="minp" id="tm-name" placeholder="Название задачи" maxlength="100">
    <div class="mlbl">Срок</div>
    <div class="dur-row" id="tm-scope-row"></div>
-   <div class="mlbl">Назначить на день (по желанию)</div>
+   <div class="mlbl">Назначить дату</div>
    <div class="cal-nav"><button id="tm-cal-prev">‹</button><span id="tm-cal-mlbl"></span><button id="tm-cal-next">›</button></div>
    <div class="cal-grid"><div class="cal-head">Пн</div><div class="cal-head">Вт</div><div class="cal-head">Ср</div><div class="cal-head">Чт</div><div class="cal-head">Пт</div><div class="cal-head">Сб</div><div class="cal-head">Вс</div></div>
    <div class="cal-grid" id="tm-cal-grid"></div>
@@ -585,8 +596,29 @@ html, body {
   <div class="mactions" style="flex-direction:column;gap:8px">
    <button class="mbtn secondary" id="ta-edit-btn">✏️ Редактировать</button>
    <button class="mbtn secondary" id="ta-addsub-btn">➕ Добавить подзадачу</button>
+   <button class="mbtn secondary" id="ta-reorder-btn">🔀 Изменить порядок</button>
    <button class="mbtn secondary" onclick="CM('taskActionsModal')">Отмена</button>
   </div>
+ </div>
+</div>
+
+<!-- Habit long-press actions -->
+<div class="moverlay" id="habitActionsModal">
+ <div class="modal">
+  <h3>Действия</h3>
+  <div class="mactions" style="flex-direction:column;gap:8px">
+   <button class="mbtn secondary" id="ha-reorder-btn">🔀 Изменить порядок</button>
+   <button class="mbtn secondary" onclick="CM('habitActionsModal')">Отмена</button>
+  </div>
+ </div>
+</div>
+
+<!-- Generic reorder list (habits or tasks) -->
+<div class="moverlay" id="reorderModal">
+ <div class="modal">
+  <h3 id="reorder-title">Изменить порядок</h3>
+  <div class="mscroll" id="reorder-list" style="max-height:60vh"></div>
+  <div class="mactions"><button class="mbtn primary" onclick="CM('reorderModal')">Готово</button></div>
  </div>
 </div>
 
@@ -633,7 +665,7 @@ function lsLoad(k, d) { try { const v = localStorage.getItem(k); return v ? JSON
 // ══════════════════════════════════════════
 const DV_ALL = [1,2,3,4,5,6,0];
 let habits = lsLoad(LH, []).map(h => ({ days: DV_ALL.slice(), duration: 'forever', priority: 3, emoji: '🌸', history: {}, ...h }));
-let tasks  = lsLoad(LT, []); // {id,text,done,urgent,scope,dueDate,weekStart,parentId,createdAt}
+let tasks  = lsLoad(LT, []).map(t => ({ order: parseInt(t.id)||0, ...t })); // {id,text,done,urgent,scope,dueDate,weekStart,parentId,createdAt,order}
 
 let activeTab = 'habits';
 
@@ -819,7 +851,7 @@ function renderHabits() {
       return `<div class="wd${h.history[dk]?' done':''}"></div>`;
     }).join('');
 
-    html += `<div class="habit-card${done?' done':''}" onclick="toggleH('${h.id}',event)">
+    html += `<div class="habit-card${done?' done':''}" data-id="${h.id}">
       <div class="hc-check"></div>
       <div class="hc-info">
         <div class="hc-name">${esc(h.emoji||'🌸')} ${esc(h.name)}</div>
@@ -835,10 +867,10 @@ function renderHabits() {
   });
   html += `</div>`;
   el.innerHTML = html;
+  attachHabitGestures();
 }
 
-function toggleH(id, ev) {
-  if (ev.target.closest('.hc-edit')) return;
+function toggleH(id) {
   const h = habits.find(x=>x.id===id); if (!h) return;
   const t = today(); h.history[t] = !h.history[t];
   lsSave(LH, habits); renderHabits(); updateTopCard();
@@ -916,6 +948,100 @@ document.getElementById('cal-prev').onclick=()=>{ calM--;if(calM<0){calM=11;calY
 document.getElementById('cal-next').onclick=()=>{ calM++;if(calM>11){calM=0;calY++;}renderCal(); };
 function togCal(dk) { const h=habits.find(x=>x.id===calHId); if(!h) return; h.history[dk]=!h.history[dk]; lsSave(LH,habits); renderCal(); renderHabits(); updateTopCard(); }
 
+// ── habit gestures: tap checkbox only toggles; long-press opens actions ──
+function attachHabitGestures() {
+  document.querySelectorAll('.habit-card').forEach(card => {
+    const id = card.dataset.id;
+    let x0=0, y0=0, moved=false, longTimer=null, longFired=false, active=false, onCheckbox=false, isTouch=false;
+
+    const start = (e) => {
+      if (e.target.closest('.hc-edit')) { active = false; return; }
+      active = true;
+      onCheckbox = !!e.target.closest('.hc-check');
+      const pt = e.touches ? e.touches[0] : e;
+      x0 = pt.clientX; y0 = pt.clientY; moved = false; longFired = false;
+      longTimer = setTimeout(() => { longFired = true; openHabitActions(); }, 550);
+    };
+    const move = (e) => {
+      if (!active) return;
+      const pt = e.touches ? e.touches[0] : e;
+      const dx = pt.clientX - x0, dy = pt.clientY - y0;
+      if (Math.abs(dx) > 10 || Math.abs(dy) > 10) { clearTimeout(longTimer); moved = true; }
+    };
+    const end = (e) => {
+      if (!active) return;
+      clearTimeout(longTimer);
+      if (longFired) { longFired = false; return; }
+      if (moved) return;
+      if (onCheckbox) toggleH(id);
+    };
+    const cancel = () => { clearTimeout(longTimer); };
+
+    card.addEventListener('touchstart', e => { isTouch=true; start(e); }, {passive:true});
+    card.addEventListener('touchmove', move, {passive:true});
+    card.addEventListener('touchend', e => { end(e); setTimeout(()=>isTouch=false,400); });
+    card.addEventListener('touchcancel', cancel);
+    card.addEventListener('mousedown', e => { if(!isTouch) start(e); });
+    card.addEventListener('mousemove', e => { if (!isTouch && e.buttons===1) move(e); });
+    card.addEventListener('mouseup', e => { if(!isTouch) end(e); });
+  });
+}
+function openHabitActions() { SM('habitActionsModal'); }
+document.getElementById('ha-reorder-btn').addEventListener('click', () => { CM('habitActionsModal'); openHabitReorder(); });
+
+// ── reorder list (shared modal for habits and tasks) ──
+function reorderRowHTML(id, label, isFirst, isLast, kind) {
+  return `<div class="reorder-row">
+    <span class="reorder-label">${label}</span>
+    <div class="reorder-btns">
+      <button class="reorder-btn" ${isFirst?'disabled':''} onclick="moveReorderItem('${kind}','${id}',-1)">▲</button>
+      <button class="reorder-btn" ${isLast?'disabled':''} onclick="moveReorderItem('${kind}','${id}',1)">▼</button>
+    </div>
+  </div>`;
+}
+let reorderMode = null;
+function openHabitReorder() {
+  reorderMode = 'habits';
+  document.getElementById('reorder-title').textContent = 'Порядок привычек';
+  renderReorderList();
+  SM('reorderModal');
+}
+function openTaskReorder() {
+  reorderMode = 'tasks';
+  document.getElementById('reorder-title').textContent = 'Порядок задач';
+  renderReorderList();
+  SM('reorderModal');
+}
+function renderReorderList() {
+  const el = document.getElementById('reorder-list');
+  if (reorderMode === 'habits') {
+    if (!habits.length) { el.innerHTML = `<div class="empty-card" style="padding:24px 16px"><p>Нет привычек</p></div>`; return; }
+    el.innerHTML = habits.map((h,idx) => reorderRowHTML(h.id, `${esc(h.emoji||'🌸')} ${esc(h.name)}`, idx===0, idx===habits.length-1, 'habit')).join('');
+  } else {
+    const cw = currentWeekStartStr();
+    const list = tasks.filter(t=>!t.parentId && t.weekStart===cw && !t.done).sort((a,b)=>(a.order||0)-(b.order||0));
+    if (!list.length) { el.innerHTML = `<div class="empty-card" style="padding:24px 16px"><p>Нет активных задач на этой неделе</p></div>`; return; }
+    el.innerHTML = list.map((t,idx) => reorderRowHTML(t.id, esc(t.text) + (t.urgent?' 🔥':''), idx===0, idx===list.length-1, 'task')).join('');
+  }
+}
+function moveReorderItem(kind, id, dir) {
+  if (kind === 'habit') {
+    const idx = habits.findIndex(x=>x.id===id);
+    const swap = idx + dir;
+    if (swap < 0 || swap >= habits.length) return;
+    [habits[idx], habits[swap]] = [habits[swap], habits[idx]];
+    lsSave(LH, habits); renderHabits(); updateTopCard(); renderReorderList();
+  } else {
+    const cw = currentWeekStartStr();
+    const list = tasks.filter(t=>!t.parentId && t.weekStart===cw && !t.done).sort((a,b)=>(a.order||0)-(b.order||0));
+    const idx = list.findIndex(x=>x.id===id);
+    const swap = idx + dir;
+    if (swap < 0 || swap >= list.length) return;
+    const tmp = list[idx].order; list[idx].order = list[swap].order; list[swap].order = tmp;
+    lsSave(LT, tasks); renderTasks(); updateTopCard(); renderReorderList();
+  }
+}
+
 // ══════════════════════════════════════════
 //  RENDER: tasks
 // ══════════════════════════════════════════
@@ -965,7 +1091,7 @@ function renderTasks() {
   const el = document.getElementById('tasks-content');
   const cw = currentWeekStartStr();
   const roots = tasks.filter(t => !t.parentId && t.weekStart === cw);
-  const activeRoots = roots.filter(t=>!t.done).sort((a,b)=> (b.urgent-a.urgent) || (a.dueDate||'9999').localeCompare(b.dueDate||'9999'));
+  const activeRoots = roots.filter(t=>!t.done).sort((a,b)=> (a.order||0) - (b.order||0));
   const doneRoots = roots.filter(t=>t.done);
 
   if (!roots.length) {
@@ -1077,9 +1203,10 @@ function attachTaskGestures() {
     const id = wrap.dataset.id;
     const card = wrap.querySelector('.task-card');
     const delBg = wrap.querySelector('.task-delete-bg');
-    let x0=0, y0=0, dragging=false, moved=false, longTimer=null, longFired=false, isTouch=false;
+    let x0=0, y0=0, dragging=false, moved=false, longTimer=null, longFired=false, isTouch=false, onCheckbox=false;
 
     const start = (e) => {
+      onCheckbox = !!e.target.closest('.tc-check');
       const pt = e.touches ? e.touches[0] : e;
       x0 = pt.clientX; y0 = pt.clientY; dragging = false; moved = false; longFired = false;
       longTimer = setTimeout(() => { longFired = true; openTaskActions(id); }, 550);
@@ -1111,13 +1238,15 @@ function attachTaskGestures() {
       }
       if (longFired) { longFired = false; return; }
       // The finger moved (e.g. scrolling the page vertically) but it wasn't
-      // classified as a horizontal swipe — do NOT toggle the task in that case.
+      // classified as a horizontal swipe — do NOT act in that case.
       if (moved) { return; }
       if (wrap.classList.contains('open')) {
         card.style.transform='translateX(0)'; delBg.style.transform='translateX(0)';
         wrap.classList.remove('open'); return;
       }
-      toggleTaskDone(id);
+      // Only a tap directly on the checkbox marks the task done — tapping
+      // anywhere else on the card body does nothing.
+      if (onCheckbox) toggleTaskDone(id);
     };
     const cancel = () => { clearTimeout(longTimer); dragging = false; };
 
@@ -1138,6 +1267,7 @@ function attachTaskGestures() {
 function openTaskActions(id) { taskActionsId = id; SM('taskActionsModal'); }
 document.getElementById('ta-edit-btn').addEventListener('click', () => { CM('taskActionsModal'); openTaskModal(taskActionsId, null); });
 document.getElementById('ta-addsub-btn').addEventListener('click', () => { CM('taskActionsModal'); openTaskModal(null, taskActionsId); });
+document.getElementById('ta-reorder-btn').addEventListener('click', () => { CM('taskActionsModal'); openTaskReorder(); });
 
 // ── task create/edit modal ──
 function buildTMScope() {
@@ -1210,7 +1340,7 @@ function saveTaskModal() {
     Object.assign(tsk, { text:name, scope:tmScope, dueDate:tmDue, urgent:tmUrgent, weekStart });
     showToast('Сохранено ✓');
   } else {
-    tasks.push({ id:Date.now().toString(), text:name, done:false, urgent:tmUrgent, scope:tmScope, dueDate:tmDue, weekStart, parentId: taskParentId||null, createdAt: today() });
+    tasks.push({ id:Date.now().toString(), text:name, done:false, urgent:tmUrgent, scope:tmScope, dueDate:tmDue, weekStart, parentId: taskParentId||null, createdAt: today(), order: Date.now() });
     showToast(taskParentId ? '➕ Подзадача добавлена' : '✅ Задача добавлена');
   }
   lsSave(LT, tasks);
@@ -1224,9 +1354,6 @@ function deleteTaskFromModal() {
   const id = taskEditId;
   askConfirm('Удалить задачу?','Подзадачи тоже будут удалены.', () => { deleteTaskById(id); CM('tmodal'); });
 }
-
-document.getElementById('add-task-bar').addEventListener('click', () => openTaskModal(null, null));
-document.getElementById('atb-plus').addEventListener('click', (e) => { e.stopPropagation(); openTaskModal(null, null); });
 
 // ══════════════════════════════════════════
 //  MODAL / TOAST HELPERS
