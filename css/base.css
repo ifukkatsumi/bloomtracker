@@ -1,16 +1,28 @@
 :root {
+  /* Палитра темы — переопределяется в css/themes.css через [data-theme] */
+  --accent-rgb:     244,114,168;
+  --accent3-rgb:    192,100,220;
+  --accent3:        #9050c0;
+  --surface-rgb:    255,255,255;
+  --shadow-rgb:     180,80,130;
+  --ink-rgb:        60,20,40;
+  --muted-rgb:      200,180,190;
+  --glass-border:   rgba(255,255,255,0.75);
+  --glass-hi:       rgba(255,255,255,0.8);
+  --modal-bg:       rgba(255,248,252,0.97);
   --grad-btn:       linear-gradient(135deg, #f472a8 0%, #e05fa0 100%);
   --grad-tab:       linear-gradient(135deg, #f472a8 0%, #e879c8 100%);
   --grad-progress:  linear-gradient(90deg, #f472a8, #e879c8);
-  --grad-urgent:    linear-gradient(135deg, #ff8a5b 0%, #ff5e7a 100%);
-  --white:          #ffffff;
-  --cb:             rgba(255,255,255,0.6);
+  --bg-1: #fbd0df; --bg-2: #dda0cc; --bg-3: #f5b8d0;
+  --bg-top: #fac8d8; --bg-mid: #e8aac8; --bg-bot: #d898be;
   --pink-dark:      #8b2252;
   --pink-mid:       #c45a8a;
-  --pink-light:     #e8a0c0;
   --text1:          #3d1a2e;
   --text2:          #8b4a6a;
   --text3:          #c48aaa;
+
+  /* Семантические цвета — одинаковые во всех темах */
+  --grad-urgent:    linear-gradient(135deg, #ff8a5b 0%, #ff5e7a 100%);
   --blur:           blur(20px);
   --r:              20px;
   --r-lg:           28px;
@@ -21,6 +33,7 @@
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 
 html, body {
+  background: var(--bg-mid); color: var(--text1);
   position: fixed; inset: 0;
   height: 100%; width: 100%;
   overflow: hidden; overscroll-behavior: none;
@@ -32,10 +45,11 @@ html, body {
 /* ─── Background ─── */
 .bg {
   position: fixed; inset: 0; z-index: 0;
-  background: radial-gradient(ellipse 120% 80% at 30% 0%,   #fbd0df 0%, transparent 60%),
-              radial-gradient(ellipse 100% 80% at 80% 100%, #dda0cc 0%, transparent 60%),
-              radial-gradient(ellipse 80%  60% at 10% 80%,  #f5b8d0 0%, transparent 50%),
-              linear-gradient(180deg, #fac8d8 0%, #e8aac8 50%, #d898be 100%);
+  background: radial-gradient(ellipse 120% 80% at 30% 0%,   var(--bg-1) 0%, transparent 60%),
+              radial-gradient(ellipse 100% 80% at 80% 100%, var(--bg-2) 0%, transparent 60%),
+              radial-gradient(ellipse 80%  60% at 10% 80%,  var(--bg-3) 0%, transparent 50%),
+              linear-gradient(180deg, var(--bg-top) 0%, var(--bg-mid) 50%, var(--bg-bot) 100%);
+  transition: background .4s ease;
 }
 
 /* ─── App shell ─── */
@@ -65,12 +79,12 @@ html, body {
 .toast {
   position: fixed; bottom: calc(var(--sb) + 90px); left: 50%;
   transform: translateX(-50%) translateY(14px);
-  background: rgba(60,20,40,0.88); color: #fff;
+  background: rgba(var(--ink-rgb),0.88); color: #fff;
   padding: 10px 20px; border-radius: 22px; font-size: 13px; font-weight: 600;
   backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
   opacity: 0; transition: all .25s; pointer-events: none;
   white-space: nowrap; z-index: 300;
-  box-shadow: 0 4px 16px rgba(60,20,40,0.25);
+  box-shadow: 0 4px 16px rgba(var(--ink-rgb),0.25);
 }
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 

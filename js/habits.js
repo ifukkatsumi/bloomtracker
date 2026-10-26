@@ -5,6 +5,7 @@ import { state, saveHabits } from './state.js';
 import { today, weekDates, pad, MO_RU } from './dates.js';
 import { calcStreak, wkPct, moPct, avgPct, isPlannedOn, isActiveOn, isEnded } from './stats.js';
 import { $, esc, SM, CM, onAction, askConfirm, showToast, flashInvalid, attachCardGestures } from './ui.js';
+import { attachSortable } from './sortable.js';
 import { updateTopCard } from './topcard.js';
 
 const EMOJIS = ['🌸','🌿','✨','💧','🌙','☀️','📚','🏃','💪','🎨','🧘','❤️','🍎','😴','🎯','🫧'];
@@ -14,9 +15,21 @@ const DURS = [{v:'week',l:'7 дней'},{v:'month',l:'Месяц'},{v:'3months',
 
 let editId = null, hmEmoji = '🌸', hmDays = DV.slice(), hmDur = 'forever', hmPri = 3;
 let calHId = null, calY = 0, calM = 0;
+let sortMode = false;
 
 const findH = id => state.habits.find(x => x.id === id);
 function refresh() { saveHabits(); renderHabits(); updateTopCard(); }
+
+// Отметка дня. Снятая отметка удаляет ключ — формат { 'YYYY-MM-DD': true } не меняется.
+function setMark(h, dk, on) {
+  if (!h.history || typeof h.history !== 'object') h.history = {};
+  if (on) h.history[dk] = true; else delete h.history[dk];
+}
+
+// ── sort mode ──
+export function exitHabitSort() { if (sortMode) { sortMode = false; renderHabits(); } }
+function enterHabitSort() { sortMode = true; renderHabits(); showToast('Удерживай и перетаскивай'); }
+onAction('habit-sort-done', exitHabitSort);
 
 // ── list ──
 export function renderHabits() {
@@ -26,6 +39,7 @@ export function renderHabits() {
   const todayIdx = (new Date().getDay() + 6) % 7;
 
   if (!habits.length) {
+    sortMode = false;
     el.innerHTML = `<div class="empty-card"><div class="ei">🌸</div><p>Пока нет привычек. Создайте первую —<br>маленький ежедневный ритуал.</p></div>`;
     return;
   }
@@ -57,7 +71,8 @@ export function renderHabits() {
     </div>
   </div>`;
 
-  html += `<div class="slabel">Привычки</div><div class="habits-container">`;
+  html += sortMode ? sortHint('habit-sort-done') : `<div class="slabel">Привычки</div>`;
+  html += `<div class="habits-container${sortMode?' sort-mode':''}">`;
   habits.forEach(h => {
     const ended = isEnded(h);
     const planned = isPlannedOn(h, t);
@@ -68,7 +83,7 @@ export function renderHabits() {
       return `<div class="wd${h.history[dk]?' done':''}"></div>`;
     }).join('');
 
-    html += `<div class="habit-card${done?' done':''}${ended?' ended':''}" data-id="${esc(h.id)}">
+    html += `<div class="habit-card sort-item${done?' done':''}${ended?' ended':''}" data-id="${esc(h.id)}">
       <div class="hc-check"></div>
       <div class="hc-info">
         <div class="hc-name">${esc(h.emoji||'🌸')} ${esc(h.name)}</div>
@@ -79,24 +94,48 @@ export function renderHabits() {
           <div class="wdots">${dots}</div>
         </div>
       </div>
-      <div class="hc-edit" data-action="habit-edit" data-id="${esc(h.id)}">···</div>
+      ${sortMode ? `<div class="sort-grip" aria-hidden="true"></div>` : `<div class="hc-edit" data-action="habit-edit" data-id="${esc(h.id)}">···</div>`}
     </div>`;
   });
   html += `</div>`;
   el.innerHTML = html;
 
-  // tap checkbox only toggles; long-press opens actions
-  el.querySelectorAll('.habit-card').forEach(card => attachCardGestures(card, {
-    checkSel: '.hc-check',
-    ignoreSel: '.hc-edit',
-    onTap: () => toggleH(card.dataset.id),
-    onLong: () => SM('habitActionsModal'),
-  }));
+  const container = el.querySelector('.habits-container');
+  container.querySelectorAll('.habit-card').forEach(card => {
+    if (sortMode) {
+      attachSortable(card, {
+        container, itemSel: '.habit-card',
+        onTap: exitHabitSort,
+        onDrop: ids => {
+          const byId = new Map(state.habits.map(h => [h.id, h]));
+          const sorted = ids.map(id => byId.get(id)).filter(Boolean);
+          state.habits = [...sorted, ...state.habits.filter(h => !ids.includes(h.id))];
+          refresh();
+        },
+      });
+    } else {
+      // tap checkbox only toggles; long-press включает сортировку
+      attachCardGestures(card, {
+        checkSel: '.hc-check',
+        ignoreSel: '.hc-edit',
+        onTap: () => toggleH(card.dataset.id),
+        onLong: enterHabitSort,
+      });
+    }
+  });
+}
+
+export function sortHint(doneAction) {
+  return `<div class="sort-hint">
+    <span class="sort-hint-ic">↕</span>
+    <span class="sort-hint-txt">Удерживай и перетаскивай.<br>Коснись карточки, чтобы закончить</span>
+    <button class="sort-hint-btn" data-action="${doneAction}">Готово</button>
+  </div>`;
 }
 
 function toggleH(id) {
   const h = findH(id); if (!h) return;
-  const t = today(); h.history[t] = !h.history[t];
+  const t = today(); setMark(h, t, !h.history[t]);
   refresh();
   if (h.history[t]) showToast('Отмечено ✓');
 }
@@ -151,11 +190,13 @@ onAction('habit-save', () => {
   const name = $('hm-name').value.trim();
   if (!name) { flashInvalid($('hm-name')); return; }
   if (!hmDays.length) { showToast('Выбери хотя бы один день'); return; }
-  if (editId) {
-    Object.assign(findH(editId), {name, emoji:hmEmoji, days:hmDays, duration:hmDur, priority:hmPri});
+  const h = editId && findH(editId);
+  if (h) {
+    // меняем только настройки — history и createdAt остаются как были
+    Object.assign(h, {name, emoji:hmEmoji, days:hmDays.slice(), duration:hmDur, priority:hmPri});
     showToast('Сохранено ✓');
   } else {
-    state.habits.push({id:Date.now().toString(), name, emoji:hmEmoji, days:hmDays, duration:hmDur, priority:hmPri, history:{}, createdAt:today()});
+    state.habits.push({id:Date.now().toString(), name, emoji:hmEmoji, days:hmDays.slice(), duration:hmDur, priority:hmPri, history:{}, createdAt:today()});
     showToast('🌸 Привычка добавлена!');
   }
   CM('hmodal'); refresh();
@@ -168,9 +209,9 @@ onAction('habit-delete', () => {
   });
 });
 
-// ── habit calendar ──
+// ── habit calendar (открывается поверх окна редактирования) ──
 onAction('habit-history', () => {
-  CM('hmodal'); calHId = editId;
+  calHId = editId;
   const now = new Date(); calY = now.getFullYear(); calM = now.getMonth();
   renderCal(); SM('calmodal');
 });
@@ -178,11 +219,14 @@ function renderCal() {
   const h = findH(calHId); if (!h) return;
   $('cal-title').textContent = `${h.emoji||'🌸'} ${h.name}`;
   $('cal-mlbl').textContent = `${MO_RU[calM]} ${calY}`;
+  const prefix = `${calY}-${pad(calM+1)}-`;
+  const marks = Object.keys(h.history).filter(k => k.startsWith(prefix) && h.history[k]).length;
+  $('cal-count').textContent = marks ? `Отмечено дней: ${marks}` : 'В этом месяце отметок нет';
   const first = new Date(calY,calM,1).getDay(); const off = first===0?6:first-1;
   const dim = new Date(calY,calM+1,0).getDate(); const t = today();
   let g = ''; for (let i=0;i<off;i++) g += `<div></div>`;
   for (let d=1; d<=dim; d++) {
-    const dk = `${calY}-${pad(calM+1)}-${pad(d)}`;
+    const dk = prefix + pad(d);
     if (dk > t) { g += `<div class="cal-day future">${d}</div>`; continue; }
     g += `<div class="cal-day${h.history[dk]?' has':''}${dk===t?' today':''}" data-action="habit-cal-day" data-day="${dk}">${d}</div>`;
   }
@@ -192,6 +236,7 @@ $('cal-prev').onclick = () => { calM--; if (calM<0) { calM=11; calY--; } renderC
 $('cal-next').onclick = () => { calM++; if (calM>11) { calM=0; calY++; } renderCal(); };
 onAction('habit-cal-day', d => {
   const h = findH(calHId); if (!h) return;
-  h.history[d.day] = !h.history[d.day];
-  renderCal(); refresh();
+  setMark(h, d.day, !h.history[d.day]);
+  refresh(); renderCal();
 });
+export function refreshHabitCalendar() { if ($('calmodal').classList.contains('show')) renderCal(); }

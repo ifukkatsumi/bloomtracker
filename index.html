@@ -9,10 +9,13 @@
 <meta name="theme-color" content="#f9c4d2">
 <title>Bloom</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<script>try{document.documentElement.dataset.theme=localStorage.getItem('bloom_theme')||'pink'}catch(e){}</script>
 <link rel="stylesheet" href="css/base.css">
+<link rel="stylesheet" href="css/themes.css">
 <link rel="stylesheet" href="css/layout.css">
 <link rel="stylesheet" href="css/components.css">
 <link rel="stylesheet" href="css/modals.css">
+<link rel="stylesheet" href="css/marathon.css">
 <script type="module" src="js/main.js"></script>
 </head>
 <body>
@@ -26,7 +29,7 @@
       <div class="hd-meta" id="date-str"></div>
       <div class="hd-title">Bloom <span class="sparkle">✦</span></div>
     </div>
-    <div class="settings-btn" id="backup-btn">⚙️</div>
+    <button class="settings-btn" data-action="open-settings" aria-label="Настройки">⚙️</button>
   </div>
 
   <div class="progress-card" id="progress-card"></div>
@@ -37,6 +40,9 @@
     </div>
     <div class="sec" id="sec-tasks">
       <div id="tasks-content"></div>
+    </div>
+    <div class="sec" id="sec-marathon">
+      <div id="marathon-content"></div>
     </div>
   </div>
 </div>
@@ -49,6 +55,9 @@
   </div>
   <div class="bar-tab" data-tab="tasks">
     <div class="bt-pill"><div class="bt-icon">☑</div><div class="bt-lbl">Задачи</div></div>
+  </div>
+  <div class="bar-tab" data-tab="marathon">
+    <div class="bt-pill"><div class="bt-icon">❄</div><div class="bt-lbl">Марафон</div></div>
   </div>
 </div>
 
@@ -80,7 +89,8 @@
   <div class="cal-nav"><button id="cal-prev">‹</button><span id="cal-mlbl"></span><button id="cal-next">›</button></div>
   <div class="cal-grid"><div class="cal-head">Пн</div><div class="cal-head">Вт</div><div class="cal-head">Ср</div><div class="cal-head">Чт</div><div class="cal-head">Пт</div><div class="cal-head">Сб</div><div class="cal-head">Вс</div></div>
   <div class="cal-grid" id="cal-grid"></div>
-  <div class="mactions"><button class="mbtn secondary" data-action="close" data-modal="calmodal">Закрыть</button></div>
+  <div class="cal-count" id="cal-count"></div>
+  <div class="mactions"><button class="mbtn secondary" data-action="close" data-modal="calmodal">Готово</button></div>
  </div>
 </div>
 
@@ -123,29 +133,9 @@
   <div class="mactions" style="flex-direction:column;gap:8px">
    <button class="mbtn secondary" data-action="task-edit">✏️ Редактировать</button>
    <button class="mbtn secondary" data-action="task-addsub">➕ Добавить подзадачу</button>
-   <button class="mbtn secondary" data-action="open-reorder" data-kind="tasks" data-from="taskActionsModal">🔀 Изменить порядок</button>
+   <button class="mbtn secondary" data-action="task-reorder">🔀 Изменить порядок</button>
    <button class="mbtn secondary" data-action="close" data-modal="taskActionsModal">Отмена</button>
   </div>
- </div>
-</div>
-
-<!-- Habit long-press actions -->
-<div class="moverlay" id="habitActionsModal">
- <div class="modal">
-  <h3>Действия</h3>
-  <div class="mactions" style="flex-direction:column;gap:8px">
-   <button class="mbtn secondary" data-action="open-reorder" data-kind="habits" data-from="habitActionsModal">🔀 Изменить порядок</button>
-   <button class="mbtn secondary" data-action="close" data-modal="habitActionsModal">Отмена</button>
-  </div>
- </div>
-</div>
-
-<!-- Generic reorder list (habits or tasks) -->
-<div class="moverlay" id="reorderModal">
- <div class="modal">
-  <h3 id="reorder-title">Изменить порядок</h3>
-  <div class="mscroll" id="reorder-list" style="max-height:60vh"></div>
-  <div class="mactions"><button class="mbtn primary" data-action="close" data-modal="reorderModal">Готово</button></div>
  </div>
 </div>
 
@@ -156,23 +146,87 @@
   <p id="confirm-text" style="font-size:14px;color:var(--text2);margin-bottom:6px;line-height:1.5">Это действие нельзя отменить.</p>
   <div class="mactions">
    <button class="mbtn secondary" data-action="close" data-modal="confirmModal">Нет</button>
-   <button class="mbtn danger" data-action="confirm-yes">Да, удалить</button>
+   <button class="mbtn danger" id="confirm-yes-btn" data-action="confirm-yes">Да, удалить</button>
   </div>
  </div>
 </div>
 
-<!-- Backup modal -->
+<!-- Settings -->
+<div class="moverlay" id="settingsModal">
+ <div class="modal">
+  <h3>Настройки</h3>
+  <div class="set-list">
+   <button class="set-row" data-action="open-appearance">
+    <span class="set-ic">🎨</span><span class="set-txt"><b>Оформление</b><small>Цветовая тема приложения</small></span><span class="set-chev"></span>
+   </button>
+   <button class="set-row" data-action="open-data">
+    <span class="set-ic">💾</span><span class="set-txt"><b>Мои данные</b><small>Экспорт, импорт, история</small></span><span class="set-chev"></span>
+   </button>
+  </div>
+  <div class="mactions"><button class="mbtn secondary" data-action="close" data-modal="settingsModal">Закрыть</button></div>
+ </div>
+</div>
+
+<!-- Appearance -->
+<div class="moverlay" id="themeModal">
+ <div class="modal">
+  <h3>Оформление</h3>
+  <div class="mscroll"><div class="theme-grid" id="theme-grid"></div></div>
+  <div class="mactions"><button class="mbtn primary" data-action="close" data-modal="themeModal">Готово</button></div>
+ </div>
+</div>
+
+<!-- My data -->
 <div class="moverlay" id="bmodal">
  <div class="modal">
   <h3>Мои данные</h3>
-  <p style="font-size:14px;font-weight:500;color:var(--text2);line-height:1.6;margin-bottom:16px">Все данные хранятся только локально на устройстве — никуда не отправляются. Сделай резервную копию.</p>
-  <div style="display:flex;gap:8px">
-   <button class="mbtn primary" id="export-btn">⬇ Экспорт</button>
-   <button class="mbtn secondary" id="import-trigger">⬆ Импорт</button>
+  <div class="mscroll">
+   <p class="data-lead">Все данные хранятся только локально на устройстве — никуда не отправляются. Сделай резервную копию: в неё входят привычки с историей, задачи и марафон.</p>
+   <div style="display:flex;gap:8px">
+    <button class="mbtn primary" id="export-btn">⬇ Экспорт</button>
+    <button class="mbtn secondary" id="import-trigger">⬆ Импорт</button>
+   </div>
+   <input type="file" id="import-file" accept=".json,application/json" style="display:none">
+   <div class="mdiv"></div>
+   <div id="data-diag"></div>
   </div>
-  <input type="file" id="import-file" accept=".json" style="display:none">
-  <div class="mdiv"></div>
-  <div class="mactions"><button class="mbtn secondary" data-action="close" data-modal="bmodal">Закрыть</button></div>
+  <div class="mactions"><button class="mbtn secondary" data-action="close" data-modal="bmodal">Назад</button></div>
+ </div>
+</div>
+
+<!-- Marathon task: add / edit -->
+<div class="moverlay" id="mmodal">
+ <div class="modal">
+  <h3 id="mm-title">Новая задача марафона</h3>
+  <div class="mscroll">
+   <input class="minp" id="mm-name" placeholder="Что нужно сделать?" maxlength="120">
+   <div class="mlbl">Неделя</div>
+   <div id="mm-weeks"></div>
+   <div id="mm-done-row" style="margin-top:14px">
+    <div class="all-toggle" data-action="mm-done"><div class="ack" id="mm-done-ack"></div><span class="atxt">Выполнена</span></div>
+   </div>
+  </div>
+  <div class="mactions" id="mm-actions"></div>
+ </div>
+</div>
+
+<!-- Marathon: all tasks -->
+<div class="moverlay" id="mAllModal">
+ <div class="modal" style="max-height:92vh">
+  <h3>Задачи марафона</h3>
+  <div class="m-all-stats" id="m-all-stats"></div>
+  <form class="m-quick" id="m-all-quick" autocomplete="off" style="flex-shrink:0">
+   <input class="minp m-quick-inp" placeholder="Новая задача — во входящие" maxlength="120" enterkeyhint="done">
+   <button class="m-quick-btn" type="submit" aria-label="Добавить"><span class="plus-icon"></span></button>
+  </form>
+  <div class="dur-row" id="m-all-switch" style="margin:10px 0 12px;flex-shrink:0">
+   <div class="duropt sel" data-view="all" data-action="m-all-view">Все</div>
+   <div class="duropt" data-view="inbox" data-action="m-all-view">📥 Входящие</div>
+   <div class="duropt" data-view="active" data-action="m-all-view">Активные</div>
+   <div class="duropt" data-view="done" data-action="m-all-view">✓ Готово</div>
+  </div>
+  <div class="mscroll" id="m-all-content" style="max-height:52vh"></div>
+  <div class="mactions"><button class="mbtn secondary" data-action="close" data-modal="mAllModal">Закрыть</button></div>
  </div>
 </div>
 

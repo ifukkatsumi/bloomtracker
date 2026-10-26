@@ -2,108 +2,161 @@
 //  TASKS
 // ══════════════════════════════════════════
 import { state, saveTasks } from './state.js';
-import { today, pad, MO_RU, currentWeekStartStr, mondayOf, fmtShortDate, taskDayLabel } from './dates.js';
-import { $, esc, SM, CM, onAction, askConfirm, showToast, flashInvalid, attachCardGestures } from './ui.js';
+import { today, pad, MO_RU, currentWeekStartStr, mondayOf, fmtShortDate, taskDayLabel, plural } from './dates.js';
+import { mainSections, sectionOf, subtasksOf, hasOpenSubtasks, isOverdue, byOrder } from './tasklogic.js';
+import { $, esc, SM, CM, onAction, askConfirm, showToast, flashInvalid, attachCardGestures, registerModal, keepScroll, foldClass } from './ui.js';
+import { attachSortable, reassignOrder } from './sortable.js';
+import { sortHint } from './habits.js';
 import { updateTopCard } from './topcard.js';
 
 const TSCOPES = [{v:'week',l:'Эта неделя'},{v:'month',l:'Этот месяц'}];
-const URGENT_BADGE = '<span class="hc-badge" style="background:rgba(255,120,60,.12);color:#e05a20;border-color:rgba(255,120,60,.25)">🔥 срочно</span>';
+const URGENT_BADGE = '<span class="hc-badge urgent">🔥 срочно</span>';
 const DELETE_TITLE = 'Удалить задачу?', DELETE_TEXT = 'Подзадачи тоже будут удалены.';
+const SECTIONS = [
+  { key: 'week',  title: 'Задачи на этой неделе', empty: 'На этой неделе пока пусто' },
+  { key: 'month', title: 'Задачи в этом месяце',  empty: 'До конца месяца больше ничего' },
+  { key: 'done',  title: 'Выполнено',             empty: 'Пока ничего не выполнено' },
+];
 
 let taskEditId = null, taskParentId = null;
 let tmScope = 'week', tmDue = null, tmUrgent = false;
 let taskCalY = 0, taskCalM = 0;
 let taskActionsId = null;
 let allTasksView = 'all';
+let sortMode = false;
 
 const findT = id => state.tasks.find(x => x.id === id);
-function refresh() { saveTasks(); renderTasks(); updateTopCard(); }
-
-// Невыполненные задачи прошлых недель переезжают на текущую
-export function rolloverTasks() {
-  const cw = currentWeekStartStr();
-  let changed = false;
-  state.tasks.forEach(t => { if (!t.done && t.weekStart && t.weekStart < cw) { t.weekStart = cw; changed = true; } });
-  if (changed) saveTasks();
+function refresh() {
+  saveTasks(); renderTasks(); updateTopCard();
+  if ($('allTasksModal').classList.contains('show')) keepScroll($('all-tasks-content'), renderAllTasksList);
 }
 
+// ── sort mode ──
+export function exitTaskSort() { if (sortMode) { sortMode = false; renderTasks(); } }
+function enterTaskSort() { sortMode = true; renderTasks(); showToast('Удерживай и перетаскивай'); }
+onAction('task-sort-done', exitTaskSort);
+
 // ── list ──
-function buildTaskRow(task) {
+function badges(task, sec) {
+  const subs = subtasksOf(state.tasks, task.id);
+  const parts = [];
+  if (task.urgent && !task.done) parts.push(URGENT_BADGE);
+  if (isOverdue(task)) parts.push(`<span class="hc-badge overdue">⏰ ${fmtShortDate(task.dueDate)}</span>`);
+  else if (task.dueDate) parts.push(`<span class="hc-badge">${sec === 'week' ? taskDayLabel(task.dueDate) : fmtShortDate(task.dueDate)}</span>`);
+  else if (task.scope === 'month') parts.push('<span class="hc-badge">Месяц</span>');
+  if (subs.length) parts.push(`<span class="hc-badge subs">☑ ${subs.filter(s => s.done).length}/${subs.length}</span>`);
+  return parts.join('');
+}
+
+function buildTaskGroup(task, sec, sorting) {
   const id = esc(task.id);
-  let html = `
+  let html = `<div class="task-group${sorting ? ' sort-item' : ''}" data-id="${id}">
   <div class="task-swipe-wrap" data-id="${id}">
-    <div class="task-delete-bg" data-action="task-delete-confirm" data-id="${id}">🗑<span>Удалить</span></div>
-    <div class="task-card${task.done?' done':''}${task.urgent?' urgent':''}" data-id="${id}">
+    ${sorting ? '' : `<div class="task-delete-bg" data-action="task-delete-confirm" data-id="${id}">🗑<span>Удалить</span></div>`}
+    <div class="task-card${task.done?' done':''}${task.urgent && !task.done?' urgent':''}" data-id="${id}">
       <div class="tc-check"></div>
       <div class="tc-info">
         <div class="tc-text">${esc(task.text)}</div>
-        <div class="tc-meta">
-          ${task.urgent?URGENT_BADGE:''}
-          ${task.dueDate?`<span class="hc-badge">${taskDayLabel(task.dueDate)}</span>`:''}
-          ${task.scope==='month'?'<span class="hc-badge">Месяц</span>':''}
-        </div>
+        <div class="tc-meta">${badges(task, sec)}</div>
       </div>
+      ${sorting ? '<div class="sort-grip" aria-hidden="true"></div>' : ''}
     </div>
   </div>`;
-  state.tasks.filter(x => x.parentId === task.id).forEach(s => {
+  subtasksOf(state.tasks, task.id).sort(byOrder).forEach(s => {
+    const act = !sorting;
     html += `<div class="subtask-row${s.done?' done':''}" data-id="${esc(s.id)}">
       <div class="sub-connector"></div>
-      <div class="tc-check small" data-action="task-toggle" data-id="${esc(s.id)}"></div>
+      <div class="tc-check small"${act ? ` data-action="task-toggle" data-id="${esc(s.id)}"` : ''}></div>
       <div class="tc-text small">${esc(s.text)}</div>
-      <div class="hc-edit" style="width:24px;height:24px;font-size:15px" data-action="task-edit" data-id="${esc(s.id)}">···</div>
+      ${act ? `<div class="hc-edit" style="width:24px;height:24px;font-size:15px" data-action="task-edit" data-id="${esc(s.id)}">···</div>` : ''}
     </div>`;
   });
-  return html;
+  return html + `</div>`;
 }
 
 export function renderTasks() {
-  rolloverTasks();
   const el = $('tasks-content');
-  const cw = currentWeekStartStr();
-  const roots = state.tasks.filter(t => !t.parentId && t.weekStart === cw);
-  const activeRoots = roots.filter(t=>!t.done).sort((a,b)=> (a.order||0) - (b.order||0));
-  const doneRoots = roots.filter(t=>t.done);
-
+  const roots = state.tasks.filter(t => !t.parentId);
   if (!roots.length) {
-    el.innerHTML = `<div class="empty-card"><div class="ei">✨</div><p>На этой неделе пока пусто.<br>Добавь первую задачу!</p></div>`;
+    sortMode = false;
+    el.innerHTML = `<div class="empty-card"><div class="ei">✨</div><p>Задач пока нет.<br>Добавь первую!</p></div>`;
     return;
   }
+  const secs = mainSections(state.tasks);
+  const later = roots.filter(t => !t.done && sectionOf(t) === null).length;
 
-  let html = '';
-  if (activeRoots.length) {
-    html += `<div class="slabel">Задачи на этой неделе</div><div class="tasks-container">` + activeRoots.map(buildTaskRow).join('') + `</div>`;
-  }
-  if (doneRoots.length) {
-    html += `<div class="done-div">Выполнено (${doneRoots.length})</div><div class="tasks-container">` + doneRoots.map(buildTaskRow).join('') + `</div>`;
-  }
+  let html = sortMode ? sortHint('task-sort-done') : '';
+  SECTIONS.forEach(({ key, title, empty }) => {
+    const items = secs[key];
+    const sorting = sortMode && key !== 'done';
+    const fkey = 'tasks.' + key;
+    html += `<section class="fold tsec${foldClass(fkey)}">
+      <button class="fold-head" data-action="fold" data-key="${fkey}" aria-expanded="${!foldClass(fkey)}">
+        <span class="fold-title">${title}</span><span class="chev"></span><span class="fold-count">${items.length}</span>
+      </button>
+      <div class="fold-body"><div class="fold-inner">
+        ${items.length
+          ? `<div class="tasks-container${sorting ? ' sort-mode' : ''}${sortMode && !sorting ? ' sort-frozen' : ''}" data-sec="${key}">${items.map(t => buildTaskGroup(t, key, sorting)).join('')}</div>`
+          : `<div class="fold-empty">${empty}</div>`}
+        ${key === 'month' && later ? `<button class="fold-more" data-action="open-all-tasks">+ ${later} ${plural(later,'задача','задачи','задач')} позже — в «Все задачи»</button>` : ''}
+      </div></div>
+    </section>`;
+  });
   el.innerHTML = html;
 
-  // swipe-to-delete + long-press on root task cards
-  el.querySelectorAll('.task-swipe-wrap').forEach(wrap => {
-    const id = wrap.dataset.id;
-    const card = wrap.querySelector('.task-card');
-    const delBg = wrap.querySelector('.task-delete-bg');
-    attachCardGestures(card, {
-      checkSel: '.tc-check',
-      onTap: () => toggleTaskDone(id),
-      onLong: () => { taskActionsId = id; SM('taskActionsModal'); },
-      swipe: {
-        width: 84,
-        set: x => { card.style.transform = delBg.style.transform = `translateX(${x}px)`; wrap.classList.toggle('open', x === -84); },
-        isOpen: () => wrap.classList.contains('open'),
-      },
+  el.querySelectorAll('.tasks-container').forEach(container => {
+    const sec = container.dataset.sec;
+    container.querySelectorAll(':scope > .task-group').forEach(group => {
+      const id = group.dataset.id;
+      if (sortMode) {
+        if (sec === 'done') return;
+        attachSortable(group, {
+          container, itemSel: '.task-group',
+          onTap: exitTaskSort,
+          // порядок меняется только внутри раздела — сроки и статус не трогаем
+          onDrop: ids => { reassignOrder(state.tasks, ids); saveTasks(); renderTasks(); },
+        });
+        return;
+      }
+      const wrap = group.querySelector('.task-swipe-wrap');
+      const card = wrap.querySelector('.task-card');
+      const delBg = wrap.querySelector('.task-delete-bg');
+      attachCardGestures(card, {
+        checkSel: '.tc-check',
+        onTap: () => toggleTaskDone(id),
+        onLong: () => { taskActionsId = id; SM('taskActionsModal'); },
+        swipe: {
+          width: 84,
+          set: x => { card.style.transform = delBg.style.transform = `translateX(${x}px)`; wrap.classList.toggle('open', x === -84); },
+          isOpen: () => wrap.classList.contains('open'),
+        },
+      });
     });
   });
 }
 
+// ── статусы: главная задача не выполняется, пока есть открытые подзадачи ──
+function reopenParent(parentId) {
+  const p = findT(parentId);
+  if (p && p.done) { p.done = false; delete p.doneAt; return true; }
+  return false;
+}
+
 function toggleTaskDone(id) {
   const t = findT(id); if (!t) return;
+  if (!t.done && !t.parentId && hasOpenSubtasks(state.tasks, t.id)) {
+    showToast('Сначала выполни все подзадачи');
+    document.querySelectorAll(`.task-card[data-id="${CSS.escape(t.id)}"]`).forEach(c => { c.classList.remove('shake'); void c.offsetWidth; c.classList.add('shake'); });
+    return;
+  }
   t.done = !t.done;
-  if (t.done) t.doneAt = today();
+  if (t.done) t.doneAt = today(); else delete t.doneAt;
+  const reopened = !t.done && t.parentId && reopenParent(t.parentId);
   refresh();
-  if (t.done) showToast('Выполнено ✓');
+  if (reopened) showToast('Задача снова в работе');
+  else if (t.done) showToast('Выполнено ✓');
 }
-onAction('task-toggle', d => { toggleTaskDone(d.id); if (d.refreshAll) renderAllTasksList(); });
+onAction('task-toggle', d => toggleTaskDone(d.id));
 
 function deleteTaskById(id) {
   state.tasks = state.tasks.filter(x => x.id !== id && x.parentId !== id);
@@ -112,30 +165,29 @@ function deleteTaskById(id) {
 onAction('task-delete-confirm', d => askConfirm(DELETE_TITLE, DELETE_TEXT, () => deleteTaskById(d.id)));
 
 // ── long-press action sheet ──
-onAction('task-edit',   d => { CM(d.from || 'taskActionsModal'); openTaskModal(d.id || taskActionsId, null); });
-onAction('task-addsub', () => { CM('taskActionsModal'); openTaskModal(null, taskActionsId); });
+onAction('task-edit',    d => { if (!d.id) CM('taskActionsModal'); openTaskModal(d.id || taskActionsId, null); });
+onAction('task-addsub',  () => { CM('taskActionsModal'); openTaskModal(null, taskActionsId); });
+onAction('task-reorder', () => { CM('taskActionsModal'); enterTaskSort(); });
 
 // ── All tasks / archive modal ──
-onAction('open-all-tasks', () => { setAllTasksView('all'); SM('allTasksModal'); });
+onAction('open-all-tasks', () => { setAllTasksView('all'); $('all-tasks-content').scrollTop = 0; SM('allTasksModal'); });
 onAction('all-tasks-view', d => setAllTasksView(d.view));
+registerModal('allTasksModal', { refresh: () => keepScroll($('all-tasks-content'), renderAllTasksList) });
+
 function setAllTasksView(v) {
   allTasksView = v;
   document.querySelectorAll('#all-tasks-switch .duropt').forEach(x => x.classList.toggle('sel', x.dataset.view === v));
   renderAllTasksList();
 }
 const editBtn = (id, extra = '') =>
-  `<div class="hc-edit" ${extra} data-action="task-edit" data-from="allTasksModal" data-id="${esc(id)}">···</div>`;
+  `<div class="hc-edit" ${extra} data-action="task-edit" data-id="${esc(id)}">···</div>`;
 
 function buildAllTaskRow(t) {
   return `<div class="task-card" style="cursor:default">
-    <div class="tc-check" data-action="task-toggle" data-refresh-all="1" data-id="${esc(t.id)}"></div>
+    <div class="tc-check" data-action="task-toggle" data-id="${esc(t.id)}"></div>
     <div class="tc-info">
       <div class="tc-text">${esc(t.text)}</div>
-      <div class="tc-meta">
-        ${t.urgent?URGENT_BADGE:''}
-        ${t.dueDate?`<span class="hc-badge">${fmtShortDate(t.dueDate)}</span>`:''}
-        ${t.scope==='month'?'<span class="hc-badge">Месяц</span>':''}
-      </div>
+      <div class="tc-meta">${badges(t, sectionOf(t))}</div>
     </div>
     ${editBtn(t.id)}
   </div>`;
@@ -143,19 +195,20 @@ function buildAllTaskRow(t) {
 function buildAllSubRow(s) {
   return `<div class="subtask-row">
     <div class="sub-connector"></div>
-    <div class="tc-check small" data-action="task-toggle" data-refresh-all="1" data-id="${esc(s.id)}"></div>
+    <div class="tc-check small" data-action="task-toggle" data-id="${esc(s.id)}"></div>
     <div class="tc-text small">${esc(s.text)}</div>
     ${editBtn(s.id, 'style="width:24px;height:24px;font-size:15px"')}
   </div>`;
 }
 function buildArchiveRow(t) {
   const dateLbl = t.doneAt ? fmtShortDate(t.doneAt) : '';
+  const parent = t.parentId ? findT(t.parentId) : null;
   return `<div class="task-card done" style="cursor:default">
-    <div class="tc-check"></div>
+    <div class="tc-check" data-action="task-toggle" data-id="${esc(t.id)}"></div>
     <div class="tc-info">
       <div class="tc-text">${esc(t.text)}</div>
       <div class="tc-meta">
-        ${t.urgent?URGENT_BADGE:''}
+        ${parent ? `<span class="hc-badge">↳ ${esc(parent.text)}</span>` : ''}
         ${dateLbl?`<span class="hc-badge">Выполнено: ${dateLbl}</span>`:''}
       </div>
     </div>
@@ -165,12 +218,14 @@ function buildArchiveRow(t) {
 function renderAllTasksList() {
   const el = $('all-tasks-content');
   if (allTasksView === 'all') {
-    const roots = state.tasks.filter(t => !t.parentId && !t.done);
+    const rank = t => ({ week: 0, month: 1 })[sectionOf(t)] ?? 2;
+    const roots = state.tasks.filter(t => !t.parentId && !t.done)
+      .sort((a, b) => rank(a) - rank(b) || (a.dueDate || '').localeCompare(b.dueDate || '') || byOrder(a, b));
     if (!roots.length) { el.innerHTML = `<div class="empty-card" style="padding:28px 16px"><div class="ei">✨</div><p>Нет активных задач</p></div>`; return; }
     let html = '<div class="tasks-container">';
     roots.forEach(r => {
       html += buildAllTaskRow(r);
-      state.tasks.filter(s => s.parentId === r.id && !s.done).forEach(s => html += buildAllSubRow(s));
+      subtasksOf(state.tasks, r.id).filter(s => !s.done).sort(byOrder).forEach(s => html += buildAllSubRow(s));
     });
     el.innerHTML = html + '</div>';
   } else {
@@ -180,7 +235,7 @@ function renderAllTasksList() {
   }
 }
 
-// ── task create/edit modal ──
+// ── task create/edit modal (открывается поверх текущего экрана) ──
 function buildTMScope() {
   $('tm-scope-row').innerHTML = TSCOPES.map(o=>`<div class="duropt${tmScope===o.v?' sel':''}" data-action="tm-scope" data-scope="${o.v}">${o.l}</div>`).join('');
 }
@@ -212,6 +267,7 @@ export function openTaskModal(editingId, parentId) {
   taskEditId = editingId || null;
   taskParentId = parentId || null;
   const base = taskEditId ? findT(taskEditId) : null;
+  if (taskEditId && !base) return;
 
   tmScope = base ? (base.scope||'week') : 'week';
   tmDue = base ? (base.dueDate||null) : null;
@@ -221,19 +277,22 @@ export function openTaskModal(editingId, parentId) {
   if (tmDue) { const [y,m] = tmDue.split('-'); taskCalY=+y; taskCalM=+m-1; }
   else { taskCalY=now.getFullYear(); taskCalM=now.getMonth(); }
 
-  $('tm-title').textContent = taskParentId ? 'Новая подзадача' : (taskEditId ? 'Редактировать задачу' : 'Новая задача');
+  const isSub = taskParentId || (base && base.parentId);
+  $('tm-title').textContent = taskParentId ? 'Новая подзадача' : (base ? (isSub ? 'Редактировать подзадачу' : 'Редактировать задачу') : 'Новая задача');
   $('tm-name').value = base ? base.text : '';
 
   buildTMScope(); renderTaskCal(); buildTMUrgent();
 
-  $('tm-actions').innerHTML = taskEditId ? `
+  $('tm-actions').innerHTML = base ? `
     <button class="mbtn danger" data-action="task-delete-from-modal">Удалить</button>
+    <button class="mbtn secondary" data-action="close" data-modal="tmodal">Отмена</button>
     <button class="mbtn primary" data-action="task-save">Готово</button>` : `
     <button class="mbtn secondary" data-action="close" data-modal="tmodal">Отмена</button>
     <button class="mbtn primary" data-action="task-save">Готово</button>`;
 
+  $('tmodal').querySelector('.mscroll').scrollTop = 0;
   SM('tmodal');
-  setTimeout(() => $('tm-name').focus(), 280);
+  if (!base) setTimeout(() => $('tm-name').focus(), 280);
 }
 
 onAction('task-save', () => {
@@ -242,17 +301,20 @@ onAction('task-save', () => {
   const base = taskEditId ? findT(taskEditId) : null;
   const weekStart = tmDue ? mondayOf(tmDue) : (base ? base.weekStart : currentWeekStartStr());
 
+  let reopened = false;
   if (base) {
     Object.assign(base, { text:name, scope:tmScope, dueDate:tmDue, urgent:tmUrgent, weekStart });
-    showToast('Сохранено ✓');
   } else {
     state.tasks.push({ id:Date.now().toString(), text:name, done:false, urgent:tmUrgent, scope:tmScope, dueDate:tmDue, weekStart, parentId: taskParentId||null, createdAt: today(), order: Date.now() });
-    showToast(taskParentId ? '➕ Подзадача добавлена' : '✅ Задача добавлена');
+    // новая открытая подзадача возвращает выполненную главную задачу в активные
+    if (taskParentId) reopened = reopenParent(taskParentId);
   }
   CM('tmodal'); refresh();
+  showToast(reopened ? 'Задача снова в работе' : base ? 'Сохранено ✓' : taskParentId ? '➕ Подзадача добавлена' : '✅ Задача добавлена');
 });
 
 onAction('task-delete-from-modal', () => {
   const id = taskEditId; if (!id) return;
-  askConfirm(DELETE_TITLE, DELETE_TEXT, () => { deleteTaskById(id); CM('tmodal'); });
+  const isParent = state.tasks.some(s => s.parentId === id);
+  askConfirm(isParent ? DELETE_TITLE : 'Удалить?', isParent ? DELETE_TEXT : 'Это действие нельзя отменить.', () => { CM('tmodal'); deleteTaskById(id); });
 });

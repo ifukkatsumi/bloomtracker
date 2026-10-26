@@ -56,3 +56,19 @@ export function plural(n, one, few, many) {
   if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return few;
   return many;
 }
+
+// Сдвиг даты на n дней и разница в днях — через компоненты даты, без влияния
+// часового пояса и перехода на летнее время.
+export function addDays(dk, n) { const d = parseYmd(dk); d.setDate(d.getDate() + n); return ymd(d); }
+export function daysBetween(a, b) {
+  const [ya, ma, da] = a.split('-').map(Number), [yb, mb, db] = b.split('-').map(Number);
+  return Math.round((Date.UTC(yb, mb-1, db) - Date.UTC(ya, ma-1, da)) / 864e5);
+}
+export const monthOf = dk => dk.slice(0, 7);
+
+const MON_GEN = ['янв','фев','мар','апр','мая','июн','июл','авг','сен','окт','ноя','дек'];
+// '2026-11-02', '2026-11-08' → '2–8 ноя';  '2026-11-30', '2026-12-06' → '30 ноя – 6 дек'
+export function fmtRange(a, b) {
+  const [, ma, da] = a.split('-').map(Number), [, mb, db] = b.split('-').map(Number);
+  return ma === mb ? `${da}–${db} ${MON_GEN[mb-1]}` : `${da} ${MON_GEN[ma-1]} – ${db} ${MON_GEN[mb-1]}`;
+}
