@@ -42,6 +42,12 @@ html, body {
   touch-action: manipulation;
 }
 
+/* Иконка с экрана «Домой» в режиме black-translucent (см. js/iosfix.js): растягиваем
+   каркас до настоящего низа экрана. transform делает body опорным блоком для всех
+   fixed-элементов — панели, кнопки «+», окон и тоста. */
+html.ios-gap { overflow: visible; }
+html.ios-gap body { height: auto; bottom: calc(-1 * var(--ios-gap, 0px)); transform: translateZ(0); }
+
 /* ─── Background ─── */
 .bg {
   position: fixed; inset: 0; z-index: 0;

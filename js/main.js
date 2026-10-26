@@ -1,6 +1,7 @@
 // ══════════════════════════════════════════
 //  ENTRY POINT
 // ══════════════════════════════════════════
+import './iosfix.js';
 import { state, syncFromStorage } from './state.js';
 import { today, fmtHeader } from './dates.js';
 import { $, onAction, topModal } from './ui.js';
