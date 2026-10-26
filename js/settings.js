@@ -5,13 +5,14 @@ import { LTHEME, lsGetString, lsSetString } from './storage.js';
 import { $, SM, onAction, showToast } from './ui.js';
 import { renderDataScreen } from './backup.js';
 
+// color — цвет строки состояния (theme-color) = верхний цвет фона --bg-1 этой темы.
 // p — цвета для превью: фон (верх, низ, пятно), стеклянная карточка, текст, акцент
 export const THEMES = [
-  { id: 'pink',   name: 'Розовая',    color: '#f9c4d2', p: { top: '#fac8d8', bot: '#d898be', blob: '#fbd0df', card: 'rgba(255,255,255,.7)',  text: '#3d1a2e', text2: '#c48aaa', a1: '#f472a8', a2: '#e879c8' } },
-  { id: 'light',  name: 'Светлая',    color: '#f4f6fa', p: { top: '#eef1f7', bot: '#d6dde9', blob: '#f7f9fd', card: 'rgba(255,255,255,.85)', text: '#1d2333', text2: '#8a93a6', a1: '#6f8cf0', a2: '#8a7cf0' } },
-  { id: 'dark',   name: 'Тёмная',     color: '#18121d', p: { top: '#1d1522', bot: '#120e17', blob: '#3a2140', card: 'rgba(44,35,54,.85)',    text: '#f6ecf3', text2: '#9a8596', a1: '#e86aa8', a2: '#b06ad0' } },
-  { id: 'lilac',  name: 'Сиреневая',  color: '#e2d4ef', p: { top: '#e8dcf3', bot: '#c0a8da', blob: '#ecdff6', card: 'rgba(255,255,255,.7)',  text: '#2d2040', text2: '#9a86b0', a1: '#a685c2', a2: '#926EAE' } },
-  { id: 'violet', name: 'Фиолетовая', color: '#d8c8e3', p: { top: '#ddcfe7', bot: '#ad92c3', blob: '#e2d4ea', card: 'rgba(255,255,255,.66)', text: '#281933', text2: '#8f7a9e', a1: '#8a64a0', a2: '#735184' } },
+  { id: 'pink',   name: 'Розовая',    color: '#fbd0df', p: { top: '#fac8d8', bot: '#d898be', blob: '#fbd0df', card: 'rgba(255,255,255,.7)',  text: '#3d1a2e', text2: '#c48aaa', a1: '#f472a8', a2: '#e879c8' } },
+  { id: 'light',  name: 'Светлая',    color: '#f7f9fd', p: { top: '#eef1f7', bot: '#d6dde9', blob: '#f7f9fd', card: 'rgba(255,255,255,.85)', text: '#1d2333', text2: '#8a93a6', a1: '#6f8cf0', a2: '#8a7cf0' } },
+  { id: 'dark',   name: 'Тёмная',     color: '#3a2140', p: { top: '#1d1522', bot: '#120e17', blob: '#3a2140', card: 'rgba(44,35,54,.85)',    text: '#f6ecf3', text2: '#9a8596', a1: '#e86aa8', a2: '#b06ad0' } },
+  { id: 'lilac',  name: 'Сиреневая',  color: '#ecdff6', p: { top: '#e8dcf3', bot: '#c0a8da', blob: '#ecdff6', card: 'rgba(255,255,255,.7)',  text: '#2d2040', text2: '#9a86b0', a1: '#a685c2', a2: '#926EAE' } },
+  { id: 'violet', name: 'Фиолетовая', color: '#e2d4ea', p: { top: '#ddcfe7', bot: '#ad92c3', blob: '#e2d4ea', card: 'rgba(255,255,255,.66)', text: '#281933', text2: '#8f7a9e', a1: '#8a64a0', a2: '#735184' } },
 ];
 
 export const currentTheme = () => document.documentElement.dataset.theme || 'pink';

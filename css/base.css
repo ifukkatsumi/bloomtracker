@@ -51,7 +51,10 @@ html.ios-gap body { height: auto; bottom: calc(-1 * var(--ios-gap, 0px)); transf
 /* ─── Background ─── */
 .bg {
   position: fixed; inset: 0; z-index: 0;
-  background: radial-gradient(ellipse 120% 80% at 30% 0%,   var(--bg-1) 0%, transparent 60%),
+  /* верхний край — ровный цвет --bg-1: он же цвет строки состояния (theme-color),
+     поэтому между строкой состояния и приложением нет шва */
+  background: linear-gradient(180deg, var(--bg-1) 0, transparent 110px),
+              radial-gradient(ellipse 120% 80% at 30% 0%,   var(--bg-1) 0%, transparent 60%),
               radial-gradient(ellipse 100% 80% at 80% 100%, var(--bg-2) 0%, transparent 60%),
               radial-gradient(ellipse 80%  60% at 10% 80%,  var(--bg-3) 0%, transparent 50%),
               linear-gradient(180deg, var(--bg-top) 0%, var(--bg-mid) 50%, var(--bg-bot) 100%);
