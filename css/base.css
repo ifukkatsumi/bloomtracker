@@ -65,7 +65,8 @@ html, body {
 .scroll {
   flex: 1; overflow-y: auto; overflow-x: hidden;
   padding: 0 16px;
-  padding-bottom: calc(var(--sb) + 96px);
+  /* место под нижней панелью и кнопкой «+» (её верх — на sb + 134px), чтобы последнюю карточку можно было прокрутить выше кнопки */
+  padding-bottom: calc(var(--sb) + 150px);
   -webkit-overflow-scrolling: touch;
   overscroll-behavior-y: contain;
   touch-action: pan-y;

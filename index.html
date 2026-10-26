@@ -69,12 +69,19 @@
    <input class="minp" id="hm-name" placeholder="Название привычки" maxlength="50">
    <div class="mlbl">Эмодзи</div>
    <div class="emoji-row" id="emoji-row"></div>
-   <input class="minp" id="custom-emoji" placeholder="Свой эмодзи с клавиатуры" maxlength="16" style="margin-top:8px">
+   <input class="minp" id="custom-emoji" placeholder="Ввести свой эмодзи" maxlength="16" style="margin-top:8px">
    <div class="mlbl">Дни выполнения</div>
    <div class="all-toggle" data-action="hm-all"><div class="ack" id="all-ack"></div><span class="atxt">Каждый день</span></div>
    <div class="day-row" id="day-row"></div>
    <div class="mlbl">Продолжительность</div>
    <div class="dur-row" id="dur-row"></div>
+   <div class="dur-custom" id="dur-custom" hidden>
+    <div class="dur-custom-row">
+     <input class="minp dur-num" id="dur-num" type="number" inputmode="numeric" min="1" max="999" aria-label="Количество">
+     <div class="dur-row" id="dur-units"></div>
+    </div>
+    <div class="dur-end" id="dur-end"></div>
+   </div>
    <div class="mlbl">Приоритет (влияет на статистику)</div>
    <div class="pri-row" id="pri-row"></div>
   </div>
@@ -182,31 +189,15 @@
   <h3>Мои данные</h3>
   <div class="mscroll">
    <p class="data-lead">Все данные хранятся только локально на устройстве — никуда не отправляются. Сделай резервную копию: в неё входят привычки с историей, задачи и марафон.</p>
-   <div class="mlbl" style="margin-top:0">Сохранить копию</div>
-   <div style="display:flex;gap:8px">
-    <button class="mbtn primary" id="export-btn">⬇ Файлом</button>
-    <button class="mbtn secondary" data-action="export-text">📋 Текстом</button>
-   </div>
-   <div class="mlbl">Восстановить из копии</div>
-   <div style="display:flex;gap:8px">
-    <button class="mbtn secondary" id="import-trigger">⬆ Из файла</button>
-    <button class="mbtn secondary" data-action="import-text">📋 Из текста</button>
+   <div class="data-actions">
+    <button class="mbtn primary" id="export-btn">⬇ Сохранить копию</button>
+    <button class="mbtn secondary" id="import-trigger">⬆ Восстановить из копии</button>
    </div>
    <input type="file" id="import-file" accept=".json,application/json" style="display:none">
    <div class="mdiv"></div>
    <div id="data-diag"></div>
   </div>
   <div class="mactions"><button class="mbtn secondary" data-action="close" data-modal="bmodal">Назад</button></div>
- </div>
-</div>
-
-<!-- Backup as text -->
-<div class="moverlay" id="textModal">
- <div class="modal">
-  <h3 id="text-title">Копия текстом</h3>
-  <p class="data-lead" id="text-hint" style="margin-bottom:10px"></p>
-  <textarea class="minp backup-text" id="backup-text" spellcheck="false" autocomplete="off"></textarea>
-  <div class="mactions" id="text-actions"></div>
  </div>
 </div>
 
