@@ -1,0 +1,155 @@
+/* ─── Empty state ─── */
+.empty-card {
+  background: rgba(255,255,255,0.65);
+  backdrop-filter: var(--blur); -webkit-backdrop-filter: var(--blur);
+  border: 1.5px solid rgba(255,255,255,0.75);
+  border-radius: var(--r-lg);
+  box-shadow: 0 4px 20px rgba(180,80,130,0.08);
+  padding: 42px 24px; text-align: center;
+  animation: fadeUp .3s ease both;
+}
+.empty-card .ei { font-size: 42px; margin-bottom: 14px; }
+.empty-card p { font-size: 15px; font-weight: 500; color: var(--text2); line-height: 1.55; }
+
+/* ─── Stats strip ─── */
+.stats-strip { display: flex; gap: 8px; margin-bottom: 10px; animation: fadeUp .28s ease both; }
+.stat-card {
+  flex: 1; background: rgba(255,255,255,0.65);
+  backdrop-filter: var(--blur); -webkit-backdrop-filter: var(--blur);
+  border: 1.5px solid rgba(255,255,255,0.75);
+  border-radius: 18px; padding: 12px 8px; text-align: center;
+  box-shadow: 0 2px 10px rgba(180,80,130,0.07);
+}
+.stat-card .sv { font-size: 22px; font-weight: 800; color: var(--text1); line-height: 1; }
+.stat-card .sl { font-size: 10px; font-weight: 600; color: var(--text3); margin-top: 3px; letter-spacing: 0.5px; text-transform: uppercase; }
+
+/* ─── Section label ─── */
+.slabel { font-size: 11px; font-weight: 700; color: var(--pink-mid); letter-spacing: 1px; text-transform: uppercase; padding: 4px 2px 8px; }
+
+/* ─── Bar chart ─── */
+.chart-card {
+  background: rgba(255,255,255,0.65);
+  backdrop-filter: var(--blur); -webkit-backdrop-filter: var(--blur);
+  border: 1.5px solid rgba(255,255,255,0.75);
+  border-radius: var(--r-lg);
+  box-shadow: 0 3px 16px rgba(180,80,130,0.07);
+  padding: 16px; margin-bottom: 10px;
+  animation: fadeUp .28s ease both;
+}
+.chart-title { font-size: 11px; font-weight: 700; color: var(--pink-mid); letter-spacing: 0.8px; text-transform: uppercase; margin-bottom: 10px; }
+.bars { display: flex; gap: 5px; align-items: flex-end; height: 52px; }
+.bwrap { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.btrack { flex: 1; width: 100%; background: rgba(244,114,168,0.1); border-radius: 5px; overflow: hidden; display: flex; align-items: flex-end; min-height: 4px; }
+.bfill { width: 100%; border-radius: 5px; background: var(--grad-progress); transition: height .5s ease; }
+.blbl { font-size: 9px; font-weight: 600; color: var(--text3); letter-spacing: 0.3px; }
+.bwrap.today .btrack { background: rgba(244,114,168,0.2); }
+.bwrap.today .blbl { color: var(--pink-mid); }
+
+/* ─── Habit cards ─── */
+.habits-container { display: flex; flex-direction: column; gap: 10px; animation: fadeUp .28s ease both; }
+.habit-card {
+  background: rgba(255,255,255,0.72);
+  backdrop-filter: var(--blur); -webkit-backdrop-filter: var(--blur);
+  border: 1.5px solid rgba(255,255,255,0.75);
+  border-radius: var(--r-lg);
+  box-shadow: 0 3px 16px rgba(180,80,130,0.08), inset 0 1px 0 rgba(255,255,255,0.8);
+  padding: 16px; display: flex; align-items: center; gap: 14px;
+  cursor: pointer; transition: transform .15s;
+  position: relative; overflow: hidden;
+  -webkit-user-select: none; -webkit-touch-callout: none; user-select: none;
+}
+.habit-card::before { content:''; position:absolute; left:0; top:0; bottom:0; width:4px; background:var(--grad-tab); border-radius:4px 0 0 4px; opacity:0; transition:opacity .2s; }
+.habit-card.done::before { opacity: 1; }
+.habit-card:active { transform: scale(0.98); }
+.hc-check {
+  width: 34px; height: 34px; border-radius: 50%; flex-shrink: 0;
+  border: 2px solid rgba(244,114,168,0.4);
+  background: rgba(255,255,255,0.6);
+  display: flex; align-items: center; justify-content: center; font-size: 16px;
+  transition: all .25s cubic-bezier(.34,1.56,.64,1);
+}
+.habit-card.done .hc-check { background: var(--grad-tab); border-color: transparent; box-shadow: 0 3px 12px rgba(244,114,168,0.45); }
+.habit-card.done .hc-check::after { content: '✓'; color: #fff; font-weight: 700; font-size: 15px; }
+.hc-info { flex: 1; min-width: 0; }
+.hc-name { font-size: 15px; font-weight: 600; color: var(--text1); margin-bottom: 5px; }
+.hc-meta { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.hc-badge { font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: 20px; background: rgba(244,114,168,0.12); color: var(--pink-mid); border: 1px solid rgba(244,114,168,0.2); }
+.hc-badge.pri { background: rgba(192,100,220,0.1); color: #9050c0; border-color: rgba(192,100,220,0.2); }
+.hc-badge.nottoday { background: rgba(200,180,190,0.15); color: var(--text3); border-color: transparent; font-size: 10px; }
+.wdots { display: flex; gap: 4px; }
+.wd { width: 7px; height: 7px; border-radius: 50%; background: rgba(244,114,168,0.15); }
+.wd.done { background: var(--pink-mid); box-shadow: 0 0 4px rgba(244,114,168,0.5); }
+.wd.skip { background: rgba(200,180,190,0.12); outline: 1.5px dashed rgba(200,180,190,0.3); }
+.hc-edit { width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 18px; color: var(--text3); transition: .12s; }
+.hc-edit:active { background: rgba(244,114,168,0.15); }
+
+/* ─── Task cards ─── */
+.tasks-container { display: flex; flex-direction: column; gap: 8px; animation: fadeUp .28s ease both; }
+
+.task-swipe-wrap { position: relative; border-radius: var(--r-lg); overflow: hidden; }
+.task-delete-bg {
+  position: absolute; right: -84px; top: 0; bottom: 0; width: 84px;
+  background: var(--pink-dark);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+  font-size: 18px; color: #fff; cursor: pointer;
+}
+.task-delete-bg span { font-size: 10px; font-weight: 600; letter-spacing: 0.2px; }
+.task-card {
+  position: relative; z-index: 1;
+  background: rgba(255,255,255,0.72);
+  backdrop-filter: var(--blur); -webkit-backdrop-filter: var(--blur);
+  border: 1.5px solid rgba(255,255,255,0.75);
+  border-radius: var(--r-lg);
+  box-shadow: 0 3px 16px rgba(180,80,130,0.07);
+  padding: 14px 16px; display: flex; align-items: center; gap: 12px;
+  cursor: pointer; transition: transform .18s ease;
+  will-change: transform; -webkit-user-select: none; -webkit-touch-callout: none; user-select: none;
+}
+.task-card.urgent { border-color: rgba(255,120,60,0.4); }
+.tc-check {
+  width: 26px; height: 26px; border-radius: 9px; flex-shrink: 0;
+  border: 2px solid rgba(244,114,168,0.35);
+  background: rgba(255,255,255,0.6);
+  display: flex; align-items: center; justify-content: center; font-size: 12px; color: #fff;
+  transition: all .2s cubic-bezier(.34,1.56,.64,1);
+}
+.task-card.done .tc-check { background: var(--grad-tab); border-color: transparent; box-shadow: 0 2px 8px rgba(244,114,168,0.4); }
+.task-card.done .tc-check::after { content: '✓'; font-weight: 700; }
+.tc-info { flex: 1; min-width: 0; }
+.tc-text { font-size: 15px; font-weight: 500; color: var(--text1); transition: .2s; }
+.task-card.done .tc-text { color: var(--text3); text-decoration: line-through; }
+.tc-meta { display: flex; gap: 6px; margin-top: 5px; flex-wrap: wrap; }
+
+/* Subtasks */
+.subtask-row {
+  display: flex; align-items: center; gap: 8px;
+  margin-left: 26px; margin-top: -2px;
+  background: rgba(255,255,255,0.55);
+  border: 1.5px solid rgba(255,255,255,0.6);
+  border-radius: 16px; padding: 9px 12px 9px 16px;
+  position: relative;
+}
+.sub-connector { position: absolute; left: -14px; top: 50%; width: 10px; height: 1.5px; background: rgba(244,114,168,0.35); }
+.tc-check.small { width: 20px; height: 20px; border-radius: 6px; }
+.tc-text.small { font-size: 13px; font-weight: 500; flex: 1; color: var(--text1); }
+.subtask-row.done .tc-text.small { color: var(--text3); text-decoration: line-through; }
+.subtask-row.done .tc-check.small { background: var(--grad-tab); border-color: transparent; }
+.subtask-row.done .tc-check.small::after { content: '✓'; color: #fff; font-size: 10px; }
+
+.done-div { font-size: 10px; font-weight: 700; color: var(--text3); letter-spacing: 1px; text-transform: uppercase; padding: 10px 2px 6px; }
+
+/* Reorder list */
+.reorder-row { display: flex; align-items: center; justify-content: space-between; padding: 12px 4px; border-bottom: 1px solid rgba(244,114,168,0.12); }
+.reorder-row:last-child { border-bottom: none; }
+.reorder-label { font-size: 14px; font-weight: 500; color: var(--text1); flex: 1; min-width: 0; padding-right: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.reorder-btns { display: flex; gap: 6px; flex-shrink: 0; }
+.reorder-btn {
+  width: 32px; height: 32px; border-radius: 10px;
+  border: 1.5px solid rgba(244,114,168,0.25);
+  background: rgba(255,255,255,0.7); color: var(--pink-mid);
+  font-size: 14px; cursor: pointer; transition: transform .13s;
+}
+.reorder-btn:disabled { opacity: 0.3; cursor: default; }
+.reorder-btn:active:not(:disabled) { transform: scale(0.88); }
+.hc-badge.ended { background: rgba(200,180,190,0.15); color: var(--text3); border-color: transparent; font-size: 10px; }
+.habit-card.ended { opacity: 0.6; }
