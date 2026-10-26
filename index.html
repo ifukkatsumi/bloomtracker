@@ -9,7 +9,7 @@
 <meta name="theme-color" content="#f9c4d2">
 <title>Bloom</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-<script>try{document.documentElement.dataset.theme=localStorage.getItem('bloom_theme')||'pink'}catch(e){}</script>
+<script>try{var t=localStorage.getItem('bloom_theme')||'pink';document.documentElement.dataset.theme=t;var c={pink:'#f9c4d2',light:'#f4f6fa',dark:'#18121d',lilac:'#e2d4ef',violet:'#d8c8e3'}[t];if(c)document.querySelector('meta[name="theme-color"]').setAttribute('content',c)}catch(e){}</script>
 <link rel="stylesheet" href="css/base.css">
 <link rel="stylesheet" href="css/themes.css">
 <link rel="stylesheet" href="css/layout.css">

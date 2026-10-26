@@ -21,9 +21,9 @@ export function applyTheme(id) {
   document.documentElement.dataset.theme = th.id;
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta) meta.setAttribute('content', th.color);
-  // тёмная тема — светлый текст статус-бара в режиме «на экран Домой»
-  const sb = document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]');
-  if (sb) sb.setAttribute('content', th.id === 'dark' ? 'black-translucent' : 'default');
+  // Строку состояния красим только через theme-color. apple-mobile-web-app-status-bar-style
+  // не трогаем: в режиме black-translucent iOS в приложении с экрана «Домой» укорачивает
+  // экран на высоту строки состояния — нижняя панель поднимается над чёрной полосой.
 }
 // Существующие пользователи без сохранённой темы остаются на розовой
 applyTheme(lsGetString(LTHEME, 'pink'));
