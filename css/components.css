@@ -184,7 +184,8 @@
 .fold-head:active .fold-title { opacity: .7; }
 .fold-body { display: grid; grid-template-rows: 1fr; opacity: 1; transition: grid-template-rows .32s ease, opacity .25s ease; }
 .fold.collapsed > .fold-body { grid-template-rows: 0fr; opacity: 0; }
-.fold-inner { min-height: 0; padding-bottom: 8px; }
+.fold-inner { min-height: 0; padding-bottom: 8px; transition: padding .32s ease; }
+.fold.collapsed > .fold-body > .fold-inner { padding-bottom: 0; }
 .fold.collapsed > .fold-body > .fold-inner, .fold.animating > .fold-body > .fold-inner { overflow: hidden; }
 .fold.collapsed > .fold-body { pointer-events: none; }
 .fold-empty { font-size: 13px; font-weight: 500; color: var(--text3); padding: 4px 4px 10px; }
