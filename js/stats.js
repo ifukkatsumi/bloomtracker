@@ -6,14 +6,21 @@ import { DV_ALL } from './state.js';
 
 const daysOf = h => h.days || DV_ALL;
 
-// Первый день, когда привычка уже не действует (или null — бессрочно)
-export function habitEnd(h) {
-  if (!h.createdAt) return null;
-  const d = parseYmd(h.createdAt);
+// Первый день, когда привычка уже не действует (или null — бессрочно).
+// duration: 'week' | 'month' | '3months' | 'forever' | 'custom' (+ durationCount, durationUnit)
+export function habitEnd(h, from = h.createdAt) {
+  if (!from) return null;
+  const d = parseYmd(from);
   switch (h.duration) {
     case 'week':    d.setDate(d.getDate() + 7); break;
     case 'month':   d.setMonth(d.getMonth() + 1); break;
     case '3months': d.setMonth(d.getMonth() + 3); break;
+    case 'custom': {
+      const n = Math.max(1, parseInt(h.durationCount) || 0);
+      if (h.durationUnit === 'month') d.setMonth(d.getMonth() + n);
+      else d.setDate(d.getDate() + n * (h.durationUnit === 'week' ? 7 : 1));
+      break;
+    }
     default: return null;
   }
   return ymd(d);

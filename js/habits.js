@@ -2,8 +2,8 @@
 //  HABITS
 // ══════════════════════════════════════════
 import { state, saveHabits } from './state.js';
-import { today, weekDates, pad, MO_RU } from './dates.js';
-import { calcStreak, wkPct, moPct, avgPct, isPlannedOn, isActiveOn, isEnded } from './stats.js';
+import { today, weekDates, pad, MO_RU, addDays, fmtShortDate } from './dates.js';
+import { calcStreak, wkPct, moPct, avgPct, isPlannedOn, isActiveOn, isEnded, habitEnd } from './stats.js';
 import { $, esc, SM, CM, onAction, askConfirm, showToast, flashInvalid, attachCardGestures } from './ui.js';
 import { attachSortable } from './sortable.js';
 import { updateTopCard } from './topcard.js';
@@ -13,7 +13,10 @@ const DL = ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
 const DV = [1,2,3,4,5,6,0];
 const DURS = [{v:'week',l:'7 дней'},{v:'month',l:'Месяц'},{v:'3months',l:'3 мес.'},{v:'forever',l:'∞'}];
 
+const UNITS = [{v:'day',l:'дней'},{v:'week',l:'недель'},{v:'month',l:'месяцев'}];
+
 let editId = null, hmEmoji = '🌸', hmDays = DV.slice(), hmDur = 'forever', hmPri = 3;
+let hmCount = 21, hmUnit = 'day';   // своя продолжительность
 let calHId = null, calY = 0, calM = 0;
 let sortMode = false;
 
@@ -142,16 +145,48 @@ function toggleH(id) {
 
 // ── habit modal ──
 function buildHM() {
-  $('emoji-row').innerHTML = EMOJIS.map(e=>`<div class="eopt${e===hmEmoji?' sel':''}" data-action="hm-emoji" data-emoji="${e}">${e}</div>`).join('');
+  // только одна строка эмодзи — столько, сколько помещается по ширине
+  const row = $('emoji-row');
+  const fit = Math.max(5, Math.floor(((row.clientWidth || 360) + 6) / 40));
+  const shown = EMOJIS.slice(0, fit);
+  row.innerHTML = shown.map(e=>`<div class="eopt${e===hmEmoji?' sel':''}" data-action="hm-emoji" data-emoji="${e}">${e}</div>`).join('');
+  // эмодзи не из строки (свой) — показываем его в поле ввода
+  const ce = $('custom-emoji');
+  if (!shown.includes(hmEmoji) && document.activeElement !== ce) ce.value = hmEmoji;
   const allOn = hmDays.length===7;
   const ac = $('all-ack'); ac.classList.toggle('on', allOn); ac.textContent = allOn?'✓':'';
   $('day-row').innerHTML = DV.map((v,i)=>`<div class="dopt${hmDays.includes(v)?' sel':''}" data-action="hm-day" data-day="${v}">${DL[i]}</div>`).join('');
-  $('dur-row').innerHTML = DURS.map(d=>`<div class="duropt${hmDur===d.v?' sel':''}" data-action="hm-dur" data-dur="${d.v}">${d.l}</div>`).join('');
+  // ✎ — своя продолжительность; число и единица — в блоке под кнопками
+  $('dur-row').innerHTML = DURS.map(d=>`<div class="duropt${hmDur===d.v?' sel':''}" data-action="hm-dur" data-dur="${d.v}">${d.l}</div>`).join('') +
+    `<div class="duropt dur-edit${hmDur==='custom'?' sel':''}" data-action="hm-dur" data-dur="custom" aria-label="Своя продолжительность">✎</div>`;
+  buildCustomDur();
   $('pri-row').innerHTML = [1,2,3,4,5].map(p=>`<div class="priopt${hmPri===p?' sel':''}" data-action="hm-pri" data-pri="${p}">${p}</div>`).join('');
 }
 onAction('hm-emoji', d => { hmEmoji = d.emoji; $('custom-emoji').value = ''; buildHM(); });
 onAction('hm-day',   d => { const v = +d.day; hmDays = hmDays.includes(v) ? hmDays.filter(x=>x!==v) : [...hmDays, v]; buildHM(); });
-onAction('hm-dur',   d => { hmDur = d.dur; buildHM(); });
+onAction('hm-dur',   d => {
+  hmDur = d.dur; buildHM();
+  if (hmDur === 'custom') setTimeout(() => { const n = $('dur-num'); n.focus(); n.select(); }, 50);
+});
+onAction('hm-unit',  d => { hmUnit = d.unit; buildHM(); });
+
+// Своя продолжительность: число + единица (дни / недели / месяцы) и дата окончания
+function buildCustomDur() {
+  const box = $('dur-custom');
+  box.hidden = hmDur !== 'custom';
+  if (box.hidden) return;
+  const num = $('dur-num');
+  if (document.activeElement !== num) num.value = hmCount;
+  $('dur-units').innerHTML = UNITS.map(u => `<div class="duropt${hmUnit===u.v?' sel':''}" data-action="hm-unit" data-unit="${u.v}">${u.l}</div>`).join('');
+  const h = editId && findH(editId);
+  const end = habitEnd({ duration: 'custom', durationCount: hmCount, durationUnit: hmUnit }, (h && h.createdAt) || today());
+  const last = addDays(end, -1);
+  $('dur-end').textContent = `Последний день: ${fmtShortDate(last)} ${last.slice(0, 4)}${end <= today() ? ' — уже прошёл' : ''}`;
+}
+$('dur-num').addEventListener('input', function () {
+  const n = parseInt(this.value);
+  if (n >= 1 && n <= 999) { hmCount = n; buildHM(); }
+});
 onAction('hm-pri',   d => { hmPri = +d.pri; buildHM(); });
 onAction('hm-all',   () => { hmDays = hmDays.length===7 ? [] : DV.slice(); buildHM(); });
 
@@ -169,7 +204,7 @@ $('custom-emoji').addEventListener('input', function() {
 });
 
 export function openAdd() {
-  editId=null; hmEmoji='🌸'; hmDays=DV.slice(); hmDur='forever'; hmPri=3;
+  editId=null; hmEmoji='🌸'; hmDays=DV.slice(); hmDur='forever'; hmPri=3; hmCount=21; hmUnit='day';
   $('hm-title').textContent = 'Новая привычка';
   $('hm-name').value = '';
   $('custom-emoji').value = '';
@@ -180,6 +215,7 @@ export function openAdd() {
 onAction('habit-edit', d => {
   const h = findH(d.id); if (!h) return;
   editId=h.id; hmEmoji=h.emoji||'🌸'; hmDays=(h.days||DV).slice(); hmDur=h.duration||'forever'; hmPri=h.priority||3;
+  hmCount=parseInt(h.durationCount)||21; hmUnit=h.durationUnit||'day';
   $('hm-title').textContent = 'Редактировать';
   $('hm-name').value = h.name;
   $('custom-emoji').value = '';
@@ -190,13 +226,16 @@ onAction('habit-save', () => {
   const name = $('hm-name').value.trim();
   if (!name) { flashInvalid($('hm-name')); return; }
   if (!hmDays.length) { showToast('Выбери хотя бы один день'); return; }
+  if (hmDur === 'custom' && !(hmCount >= 1 && hmCount <= 999)) { showToast('Укажи продолжительность от 1 до 999'); return; }
+  const dur = hmDur === 'custom' ? { duration: 'custom', durationCount: hmCount, durationUnit: hmUnit } : { duration: hmDur };
   const h = editId && findH(editId);
   if (h) {
     // меняем только настройки — history и createdAt остаются как были
-    Object.assign(h, {name, emoji:hmEmoji, days:hmDays.slice(), duration:hmDur, priority:hmPri});
+    Object.assign(h, {name, emoji:hmEmoji, days:hmDays.slice(), priority:hmPri}, dur);
+    if (hmDur !== 'custom') { delete h.durationCount; delete h.durationUnit; }
     showToast('Сохранено ✓');
   } else {
-    state.habits.push({id:Date.now().toString(), name, emoji:hmEmoji, days:hmDays.slice(), duration:hmDur, priority:hmPri, history:{}, createdAt:today()});
+    state.habits.push({id:Date.now().toString(), name, emoji:hmEmoji, days:hmDays.slice(), priority:hmPri, ...dur, history:{}, createdAt:today()});
     showToast('🌸 Привычка добавлена!');
   }
   CM('hmodal'); refresh();

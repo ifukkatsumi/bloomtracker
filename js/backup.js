@@ -4,7 +4,7 @@
 import { state, saveHabits, saveTasks, saveMarathon, normalizeHabit, normalizeTask, normalizeMarathonTask, normalizeHistory, fixParentStatus } from './state.js';
 import { LH, LT, LM, LUI, LTHEME, lsGetString, lsSave, lsLoad } from './storage.js';
 import { today, fmtShortDate } from './dates.js';
-import { $, esc, SM, CM, onAction, showToast, askConfirm, foldClass } from './ui.js';
+import { $, esc, onAction, showToast, askConfirm, foldClass } from './ui.js';
 import { M_WEEKS } from './marathonplan.js';
 
 // Обновление экрана после изменения данных — назначается в main.js
@@ -25,17 +25,17 @@ function buildBackup() {
     settings: { theme: lsGetString(LTHEME, 'pink'), ui: state.ui },
   };
 }
-const backupJSON = () => JSON.stringify(buildBackup(), null, 2);
 const isIOS = () => /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 
 // На iPhone (особенно в приложении с экрана «Домой») обычное скачивание файла
 // ненадёжно — там используем меню «Поделиться» → «Сохранить в Файлы».
 $('export-btn').addEventListener('click', async () => {
   const name = `bloom-backup-${today()}.json`;
-  const json = backupJSON();
+  const json = JSON.stringify(buildBackup(), null, 2);
   const file = new File([json], name, { type: 'application/json' });
   if (isIOS() && navigator.canShare && navigator.canShare({ files: [file] })) {
-    try { await navigator.share({ files: [file], title: 'Bloom — резервная копия' }); showToast('💾 Копия сохранена'); return; }
+    // только файл — если передать title или text, iOS сохранит его вторым документом
+    try { await navigator.share({ files: [file] }); showToast('💾 Копия сохранена'); return; }
     catch (e) { if (e && e.name === 'AbortError') return; }
   }
   const url = URL.createObjectURL(file);
@@ -44,35 +44,6 @@ $('export-btn').addEventListener('click', async () => {
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
   setTimeout(() => URL.revokeObjectURL(url), 1000);
   showToast('💾 Экспортировано!');
-});
-
-// Копия текстом — запасной способ, если с файлом что-то не так: текст можно
-// вставить в «Заметки» или отправить себе, а потом вставить обратно при импорте.
-onAction('export-text', () => {
-  $('text-title').textContent = 'Копия текстом';
-  $('text-hint').textContent = 'Здесь все данные: привычки с историей, задачи и марафон. Скопируй и сохрани, например, в «Заметки».';
-  const ta = $('backup-text'); ta.value = backupJSON(); ta.readOnly = true;
-  $('text-actions').innerHTML = `<button class="mbtn secondary" data-action="close" data-modal="textModal">Закрыть</button><button class="mbtn primary" data-action="copy-text">Скопировать</button>`;
-  SM('textModal');
-});
-onAction('copy-text', async () => {
-  const ta = $('backup-text');
-  try { await navigator.clipboard.writeText(ta.value); showToast('📋 Скопировано'); }
-  catch { ta.focus(); ta.select(); ta.setSelectionRange(0, ta.value.length); showToast(document.execCommand('copy') ? '📋 Скопировано' : 'Выдели текст и скопируй'); }
-});
-onAction('import-text', () => {
-  $('text-title').textContent = 'Импорт из текста';
-  $('text-hint').textContent = 'Вставь сюда текст резервной копии. Данные объединятся с текущими — ничего не удалится.';
-  const ta = $('backup-text'); ta.value = ''; ta.readOnly = false;
-  $('text-actions').innerHTML = `<button class="mbtn secondary" data-action="close" data-modal="textModal">Отмена</button><button class="mbtn primary" data-action="import-text-go">Импортировать</button>`;
-  SM('textModal');
-  setTimeout(() => ta.focus(), 280);
-});
-onAction('import-text-go', () => {
-  try {
-    importBackup(JSON.parse($('backup-text').value), 'текст');
-    CM('textModal');
-  } catch { showToast('❌ Не похоже на копию Bloom'); }
 });
 
 $('import-trigger').addEventListener('click', () => $('import-file').click());
@@ -109,7 +80,7 @@ export function mergeHabits(list, { updateFields = true } = {}) {
     if (cur) {
       marks += mergeHistory(cur, raw.history);
       if (updateFields && cur.id === String(raw.id)) {
-        ['name','emoji','days','priority','duration'].forEach(k => { if (raw[k] !== undefined) cur[k] = raw[k]; });
+        ['name','emoji','days','priority','duration','durationCount','durationUnit'].forEach(k => { if (raw[k] !== undefined) cur[k] = raw[k]; });
         Object.assign(cur, normalizeHabit(cur));
       }
     } else if (raw.name) {
@@ -164,7 +135,7 @@ function importBackup(data, sourceName) {
 $('import-file').addEventListener('change', async e => {
   const f = e.target.files[0]; if (!f) return;
   try { importBackup(JSON.parse(await f.text()), f.name); }
-  catch { showToast('❌ Ошибка импорта'); }
+  catch { showToast('❌ Это не похоже на копию Bloom'); }
   e.target.value = '';
 });
 
