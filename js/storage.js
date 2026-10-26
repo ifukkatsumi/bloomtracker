@@ -4,6 +4,7 @@
 export const LH = 'bloom_habits_v2';
 export const LT = 'bloom_tasks_v2';
 export const LM = 'bloom_marathon_v1';   // задачи марафона — отдельно от обычных
+export const LMC = 'bloom_mcats_v1';     // категории задач марафона
 export const LUI = 'bloom_ui_v1';        // свёрнутые разделы и прочие настройки интерфейса
 export const LTHEME = 'bloom_theme';
 

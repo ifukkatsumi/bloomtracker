@@ -3,6 +3,8 @@
 //  Без HTML5 drag-and-drop: свои обработчики touch и mouse.
 //  Долгое нажатие поднимает элемент, его копия следует за пальцем, пунктирный
 //  плейсхолдер показывает место вставки. Короткое нажатие — onTap.
+//  containers — несколько списков, между которыми можно переносить (по умолчанию
+//  только свой); пустой список тоже принимает элемент.
 // ══════════════════════════════════════════
 const HOLD_MS = 280, MOVE_TOLERANCE = 8, EDGE = 64, MAX_SPEED = 14;
 
@@ -12,6 +14,7 @@ const directChildren = (container, sel) => [...container.children].filter(el => 
 
 function pickUp(item, opts, y) {
   const { container, itemSel } = opts;
+  const groups = opts.containers || [container];
   const rect = item.getBoundingClientRect();
   const ph = document.createElement('div');
   ph.className = 'sort-ph';
@@ -26,20 +29,33 @@ function pickUp(item, opts, y) {
   item.style.display = 'none';
   if (navigator.vibrate) navigator.vibrate(8);
 
-  const scroller = item.closest('.scroll, .mscroll');
+  const scroller = item.closest('.m-scrollbox, .scroll, .mscroll');
   const offset = y - rect.top;
   let lastY = y, raf = 0, settling = false;
 
+  // список под пальцем (или ближайший по вертикали)
+  const targetList = () => {
+    if (groups.length === 1) return groups[0];
+    let best = groups[0], bestD = Infinity;
+    for (const c of groups) {
+      const r = c.getBoundingClientRect();
+      const d = lastY < r.top ? r.top - lastY : lastY > r.bottom ? lastY - r.bottom : 0;
+      if (d < bestD) { bestD = d; best = c; }
+    }
+    return best;
+  };
+
   const reposition = () => {
     ghost.style.top = (lastY - offset) + 'px';
+    const list = targetList();
     let before = null;
-    for (const s of directChildren(container, itemSel)) {
+    for (const s of directChildren(list, itemSel)) {
       if (s === item) continue;
       const r = s.getBoundingClientRect();
       if (lastY < r.top + r.height / 2) { before = s; break; }
     }
-    if (before) { if (ph.nextElementSibling !== before) container.insertBefore(ph, before); }
-    else if (container.lastElementChild !== ph) container.appendChild(ph);
+    if (before) { if (ph.nextElementSibling !== before) list.insertBefore(ph, before); }
+    else if (ph.parentNode !== list || list.lastElementChild !== ph) list.appendChild(ph);
   };
 
   // Автопрокрутка у верхнего/нижнего края — для длинных списков
@@ -67,11 +83,12 @@ function pickUp(item, opts, y) {
       ghost.classList.remove('lifted');
       ghost.style.top = r.top + 'px';
       setTimeout(() => {
-        container.insertBefore(item, ph);
+        const target = ph.parentNode;
+        target.insertBefore(item, ph);
         ph.remove(); ghost.remove();
         item.style.display = '';
         session = null;
-        opts.onDrop(directChildren(container, itemSel).map(el => el.dataset.id));
+        opts.onDrop(directChildren(target, itemSel).map(el => el.dataset.id), { id: item.dataset.id, target, source: container });
       }, 170);
     },
   };

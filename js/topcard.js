@@ -71,9 +71,8 @@ function renderMarathonTopCard() {
   else left = `<div class="pc-nums">🎉</div><div class="pc-today">ФИНИШ</div>`;
 
   const footer = s.total
-    ? `<span>✦</span><span>${s.done}/${s.total} выполнено</span>${s.inbox ? `<span class="pc-sep">·</span><span>📥 ${s.inbox} без недели</span>` : ''}`
+    ? `<span>✦</span><span>${s.done}/${s.total} выполнено</span>`
     : `<span>✦</span><span>Собери сюда все зависшие дела</span>`;
 
-  card(left, `МАРАФОН · ${fmtRange(M_START, M_END).toUpperCase()}`, '60 дней до Нового года', s.pct, footer,
-    `<button class="all-tasks-link" data-action="m-open-all">📋 Все задачи марафона</button>`);
+  card(left, `МАРАФОН · ${fmtRange(M_START, M_END).toUpperCase()}`, '60 дней до Нового года', s.pct, footer);
 }

@@ -236,3 +236,10 @@
 /* Нельзя выполнить: лёгкое покачивание */
 .task-card.shake { animation: shake .4s ease; }
 @keyframes shake { 20%,60% { transform: translateX(-5px); } 40%,80% { transform: translateX(5px); } }
+
+/* Пустой раздел в режиме сортировки — зона, куда можно перетащить задачу */
+.drop-hint { display: none; }
+.tasks-container.sort-mode.drop-empty { min-height: 64px; border: 2px dashed rgba(var(--accent-rgb),0.3); border-radius: var(--r-lg); justify-content: center; }
+.tasks-container.sort-mode.drop-empty > .drop-hint { display: block; text-align: center; font-size: 13px; font-weight: 600; color: var(--text3); padding: 18px 0; }
+.tasks-container.sort-mode:has(.sort-ph) > .drop-hint { display: none; }
+.tasks-container.sort-mode.drop-empty:has(.sort-ph) { border-color: transparent; }

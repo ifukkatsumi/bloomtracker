@@ -1,8 +1,8 @@
 // ══════════════════════════════════════════
 //  BACKUP — экспорт / импорт JSON и проверка истории
 // ══════════════════════════════════════════
-import { state, saveHabits, saveTasks, saveMarathon, normalizeHabit, normalizeTask, normalizeMarathonTask, normalizeHistory, fixParentStatus } from './state.js';
-import { LH, LT, LM, LUI, LTHEME, lsGetString, lsSave, lsLoad } from './storage.js';
+import { state, saveHabits, saveTasks, saveMarathon, saveCats, normalizeHabit, normalizeTask, normalizeMarathonTask, normalizeCategory, normalizeHistory, fixParentStatus } from './state.js';
+import { LH, LT, LM, LMC, LUI, LTHEME, lsGetString, lsSave, lsLoad } from './storage.js';
 import { today, fmtShortDate } from './dates.js';
 import { $, esc, onAction, showToast, askConfirm, foldClass } from './ui.js';
 import { M_WEEKS } from './marathonplan.js';
@@ -21,7 +21,7 @@ function buildBackup() {
   return {
     app: 'Bloom', version: BACKUP_VERSION, exportedAt: new Date().toISOString(),
     counts: countAll(),
-    tasks: state.tasks, marathon: state.marathon, habits: state.habits,
+    tasks: state.tasks, marathon: state.marathon, mcats: state.mcats, habits: state.habits,
     settings: { theme: lsGetString(LTHEME, 'pink'), ui: state.ui },
   };
 }
@@ -58,6 +58,7 @@ function countAll() {
     habits: state.habits.length, marks,
     tasks: state.tasks.length, tasksDone: state.tasks.filter(t => t.done).length,
     marathon: state.marathon.length, marathonDone: state.marathon.filter(t => t.done).length,
+    mcats: state.mcats.length,
   };
 }
 
@@ -110,15 +111,29 @@ function mergeById(target, list, normalize) {
 const LSNAP = 'bloom_snapshot_before_import';
 let lastReport = null;
 
+function mergeCats(list) {
+  const map = {};
+  validItems(list).map(normalizeCategory).filter(c => c.name).forEach(c => {
+    const same = state.mcats.find(x => x.id === c.id) || state.mcats.find(x => nameKey(x.name) === nameKey(c.name));
+    if (same) map[c.id] = same.id;
+    else if (state.mcats.length < 9) { state.mcats.push(c); map[c.id] = c.id; }
+  });
+  return map;
+}
+
 function importBackup(data, sourceName) {
   if (!data || typeof data !== 'object' || (!Array.isArray(data.habits) && !Array.isArray(data.tasks) && !Array.isArray(data.marathon))) throw new Error('bad backup');
-  lsSave(LSNAP, { at: new Date().toISOString(), habits: state.habits, tasks: state.tasks, marathon: state.marathon });
+  lsSave(LSNAP, { at: new Date().toISOString(), habits: state.habits, tasks: state.tasks, marathon: state.marathon, mcats: state.mcats });
   const h = mergeHabits(data.habits);
   const t = mergeById(state.tasks, data.tasks, normalizeTask);
   fixParentStatus(state.tasks);
+  // категории: по id, а категория с тем же названием не дублируется — её задачи
+  // переходят в уже существующую
+  const catMap = mergeCats(data.mcats);
   // в старых копиях марафона нет — текущие задачи марафона не трогаем
-  const m = Array.isArray(data.marathon) ? mergeById(state.marathon, data.marathon, normalizeMarathonTask) : { added: 0, restored: 0 };
-  saveHabits(); saveTasks(); saveMarathon();
+  const mList = validItems(data.marathon).map(t => ({ ...t, category: t.category != null ? (catMap[String(t.category)] || String(t.category)) : null }));
+  const m = Array.isArray(data.marathon) ? mergeById(state.marathon, mList, normalizeMarathonTask) : { added: 0, restored: 0 };
+  saveHabits(); saveTasks(); saveMarathon(); saveCats();
   const inFile = {
     habits: validItems(data.habits).length,
     marks: validItems(data.habits).reduce((s, x) => s + Object.keys(normalizeHistory(x.history)).length, 0),
@@ -145,7 +160,8 @@ onAction('undo-import', () => {
     state.habits = (snap.habits || []).map(normalizeHabit);
     state.tasks = (snap.tasks || []).map(normalizeTask);
     state.marathon = (snap.marathon || []).map(normalizeMarathonTask);
-    saveHabits(); saveTasks(); saveMarathon();
+    if (Array.isArray(snap.mcats)) state.mcats = snap.mcats.map(normalizeCategory);
+    saveHabits(); saveTasks(); saveMarathon(); saveCats();
     try { localStorage.removeItem(LSNAP); } catch {}
     lastReport = null;
     afterChange(); renderDataScreen(); showToast('Импорт отменён');
@@ -170,7 +186,7 @@ function reportHTML() {
 // Ищем в localStorage другие ключи с привычками (например, от прежней версии
 // приложения). Берём только реально сохранённые отметки — ничего не придумываем.
 function findLegacyHabits() {
-  const known = new Set([LH, LT, LM, LUI, LTHEME, LSNAP]);
+  const known = new Set([LH, LT, LM, LMC, LUI, LTHEME, LSNAP]);
   const found = [];
   let keys = [];
   try { keys = Object.keys(localStorage); } catch { return found; }
@@ -223,7 +239,7 @@ export function renderDataScreen() {
   $('data-diag').innerHTML = `
     ${reportHTML()}
     <div class="mlbl">Что войдёт в резервную копию</div>
-    <div class="diag-sum">Привычек ${c.habits} · отметок ${c.marks}<br>Задач и подзадач ${c.tasks} · выполнено ${c.tasksDone}<br>Марафон ${c.marathon} · выполнено ${c.marathonDone}</div>
+    <div class="diag-sum">Привычек ${c.habits} · отметок ${c.marks}<br>Задач и подзадач ${c.tasks} · выполнено ${c.tasksDone}<br>Марафон ${c.marathon} · выполнено ${c.marathonDone} · категорий ${c.mcats}</div>
     ${dataFold('data.habits', 'Привычки и отметки', c.marks, habitRows)}
     ${dataFold('data.tasks', 'Задачи', `${c.tasksDone}/${c.tasks}`, taskRows)}
     ${dataFold('data.marathon', 'Марафон', `${c.marathonDone}/${c.marathon}`, mRows)}
