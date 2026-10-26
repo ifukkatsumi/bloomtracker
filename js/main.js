@@ -7,12 +7,13 @@ import { $, onAction, topModal } from './ui.js';
 import { updateTopCard } from './topcard.js';
 import { renderHabits, openAdd, exitHabitSort, refreshHabitCalendar } from './habits.js';
 import { renderTasks, openTaskModal, exitTaskSort } from './tasks.js';
-import { renderMarathon, openMarathonModal, exitMarathonSort } from './marathon.js';
+import { renderMarathon, openMarathonModal, exitMarathonSort, focusCurrentWeek } from './marathon.js';
 import { onDataChange, renderDataScreen } from './backup.js';
 import './settings.js';
 
 const TABS = ['habits', 'tasks', 'marathon'];
 const scrollPos = {};   // позиция прокрутки каждой вкладки
+const visited = new Set(['habits']);
 
 function renderDate() { $('date-str').textContent = fmtHeader(); }
 
@@ -25,7 +26,10 @@ function switchTab(t) {
   document.querySelectorAll('.bar-tab').forEach(x => x.classList.toggle('active', x.dataset.tab === t));
   document.querySelectorAll('.sec').forEach(x => x.classList.toggle('active', x.id === 'sec-' + t));
   updateTopCard();
-  scroller.scrollTop = scrollPos[t] || 0;
+  // марафон при первом открытии — сразу к текущей неделе, потом — где остановились
+  if (t === 'marathon' && !visited.has(t)) focusCurrentWeek();
+  else scroller.scrollTop = scrollPos[t] || 0;
+  visited.add(t);
 }
 document.querySelectorAll('.bar-tab').forEach(tab => tab.addEventListener('click', () => switchTab(tab.dataset.tab)));
 
