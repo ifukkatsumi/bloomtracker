@@ -90,13 +90,15 @@ export function renderTasks() {
     const items = secs[key];
     const sorting = sortMode && key !== 'done';
     const fkey = 'tasks.' + key;
-    html += `<section class="fold tsec${foldClass(fkey)}">
+    // в режиме сортировки разделы недели и месяца раскрыты и принимают задачи, даже пустые
+    const fold = sorting ? '' : foldClass(fkey);
+    html += `<section class="fold tsec${fold}">
       <button class="fold-head" data-action="fold" data-key="${fkey}" aria-expanded="${!foldClass(fkey)}">
         <span class="fold-title">${title}</span><span class="chev"></span><span class="fold-count">${items.length}</span>
       </button>
       <div class="fold-body"><div class="fold-inner">
-        ${items.length
-          ? `<div class="tasks-container${sorting ? ' sort-mode' : ''}${sortMode && !sorting ? ' sort-frozen' : ''}" data-sec="${key}">${items.map(t => buildTaskGroup(t, key, sorting)).join('')}</div>`
+        ${items.length || sorting
+          ? `<div class="tasks-container${sorting ? ' sort-mode' : ''}${sortMode && !sorting ? ' sort-frozen' : ''}${sorting && !items.length ? ' drop-empty' : ''}" data-sec="${key}">${items.map(t => buildTaskGroup(t, key, sorting)).join('')}${sorting ? `<div class="drop-hint">Перетащи сюда задачу</div>` : ''}</div>`
           : `<div class="fold-empty">${empty}</div>`}
         ${key === 'month' && later ? `<button class="fold-more" data-action="open-all-tasks">+ ${later} ${plural(later,'задача','задачи','задач')} позже — в «Все задачи»</button>` : ''}
       </div></div>
@@ -104,6 +106,7 @@ export function renderTasks() {
   });
   el.innerHTML = html;
 
+  const sortLists = [...el.querySelectorAll('.tasks-container.sort-mode')];
   el.querySelectorAll('.tasks-container').forEach(container => {
     const sec = container.dataset.sec;
     container.querySelectorAll(':scope > .task-group').forEach(group => {
@@ -111,10 +114,15 @@ export function renderTasks() {
       if (sortMode) {
         if (sec === 'done') return;
         attachSortable(group, {
-          container, itemSel: '.task-group',
+          container, containers: sortLists, itemSel: '.task-group',
           onTap: exitTaskSort,
-          // порядок меняется только внутри раздела — сроки и статус не трогаем
-          onDrop: ids => { reassignOrder(state.tasks, ids); saveTasks(); renderTasks(); },
+          onDrop: (ids, { id: movedId, target }) => {
+            const moved = findT(movedId);
+            const to = target.dataset.sec;
+            const note = moved && to !== sec ? moveToSection(moved, to) : '';
+            reassignOrder(state.tasks, ids); saveTasks(); renderTasks(); updateTopCard();
+            if (note) showToast(note);
+          },
         });
         return;
       }
@@ -133,6 +141,17 @@ export function renderTasks() {
       });
     });
   });
+}
+
+// Перенос между разделами «неделя» / «месяц» при сортировке. Раздел задаётся
+// сроком: задаче без даты меняем scope; если дата не попадает в новый раздел,
+// дату снимаем — иначе задача сразу вернулась бы обратно. Статус и подзадачи не трогаем.
+function moveToSection(t, to) {
+  t.scope = to;
+  let cleared = false;
+  if (t.dueDate && sectionOf(t) !== to) { t.dueDate = null; cleared = true; }
+  if (to === 'week' && !t.dueDate) t.weekStart = currentWeekStartStr();
+  return `${to === 'week' ? 'На этой неделе' : 'В этом месяце'}${cleared ? ' · дата снята' : ''}`;
 }
 
 // ── статусы: главная задача не выполняется, пока есть открытые подзадачи ──

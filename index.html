@@ -209,6 +209,10 @@
    <input class="minp" id="mm-name" placeholder="Что нужно сделать?" maxlength="120">
    <div class="mlbl">Неделя</div>
    <div id="mm-weeks"></div>
+   <div id="mm-cat-row">
+    <div class="mlbl">Категория</div>
+    <div class="dur-row" id="mm-cats"></div>
+   </div>
    <div id="mm-done-row" style="margin-top:14px">
     <div class="all-toggle" data-action="mm-done"><div class="ack" id="mm-done-ack"></div><span class="atxt">Выполнена</span></div>
    </div>
@@ -217,23 +221,31 @@
  </div>
 </div>
 
-<!-- Marathon: all tasks -->
-<div class="moverlay" id="mAllModal">
+<!-- Marathon: category -->
+<div class="moverlay" id="catModal">
  <div class="modal" style="max-height:92vh">
-  <h3>Задачи марафона</h3>
-  <div class="m-all-stats" id="m-all-stats"></div>
-  <form class="m-quick" id="m-all-quick" autocomplete="off" style="flex-shrink:0">
-   <input class="minp m-quick-inp" placeholder="Новая задача — во входящие" maxlength="120" enterkeyhint="done">
+  <div class="cat-head">
+   <div><h3 id="cat-title" style="margin-bottom:2px">Категория</h3><div class="m-all-stats" id="cat-sub" style="margin:0"></div></div>
+   <div class="cat-tools">
+    <button class="cat-tool" data-action="m-cat-rename" aria-label="Переименовать">✎</button>
+    <button class="cat-tool danger" data-action="m-cat-delete" aria-label="Удалить категорию">🗑</button>
+   </div>
+  </div>
+  <form class="m-quick" data-quick="cat" autocomplete="off" style="flex-shrink:0;margin-top:12px">
+   <input class="minp m-quick-inp" placeholder="Напиши, что нужно сделать…" maxlength="120" enterkeyhint="done">
    <button class="m-quick-btn" type="submit" aria-label="Добавить"><span class="plus-icon"></span></button>
   </form>
-  <div class="dur-row" id="m-all-switch" style="margin:10px 0 12px;flex-shrink:0">
-   <div class="duropt sel" data-view="all" data-action="m-all-view">Все</div>
-   <div class="duropt" data-view="inbox" data-action="m-all-view">📥 Входящие</div>
-   <div class="duropt" data-view="active" data-action="m-all-view">Активные</div>
-   <div class="duropt" data-view="done" data-action="m-all-view">✓ Готово</div>
-  </div>
-  <div class="mscroll" id="m-all-content" style="max-height:52vh"></div>
-  <div class="mactions"><button class="mbtn secondary" data-action="close" data-modal="mAllModal">Закрыть</button></div>
+  <div class="mscroll" id="cat-list" style="max-height:56vh"></div>
+  <div class="mactions"><button class="mbtn secondary" data-action="close" data-modal="catModal">Назад</button></div>
+ </div>
+</div>
+
+<!-- Marathon: new / rename category -->
+<div class="moverlay" id="catEditModal">
+ <div class="modal">
+  <h3 id="catedit-title">Новая категория</h3>
+  <input class="minp" id="catedit-name" placeholder="Например, «Красота»" maxlength="24" enterkeyhint="done">
+  <div class="mactions"><button class="mbtn secondary" data-action="close" data-modal="catEditModal">Отмена</button><button class="mbtn primary" data-action="m-cat-save">Сохранить</button></div>
  </div>
 </div>
 
