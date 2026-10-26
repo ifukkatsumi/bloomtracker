@@ -194,3 +194,9 @@
 .import-report b { color: var(--text1); font-size: 13px; margin-bottom: 2px; }
 .diag-undo { margin-top: 8px; width: 100%; }
 .diag-sum { font-size: 13px; font-weight: 600; color: var(--text1); padding: 10px 12px; border-radius: 12px; background: rgba(var(--surface-rgb),0.6); line-height: 1.45; }
+.data-fold { margin-top: 6px; }
+.diag-row.sub { margin-left: 18px; }
+.diag-st { flex-shrink: 0; width: 18px; font-size: 12px; font-weight: 800; color: var(--text3); }
+.diag-st.done { color: var(--pink-mid); }
+.diag-row .diag-name { flex: 1; }
+.backup-text { height: 38vh; resize: none; font-family: ui-monospace, Menlo, monospace; font-size: 11px; line-height: 1.4; }

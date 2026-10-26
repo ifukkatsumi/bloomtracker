@@ -4,7 +4,8 @@
 import { state, saveHabits, saveTasks, saveMarathon, normalizeHabit, normalizeTask, normalizeMarathonTask, normalizeHistory, fixParentStatus } from './state.js';
 import { LH, LT, LM, LUI, LTHEME, lsGetString, lsSave, lsLoad } from './storage.js';
 import { today, fmtShortDate } from './dates.js';
-import { $, esc, onAction, showToast, askConfirm } from './ui.js';
+import { $, esc, SM, CM, onAction, showToast, askConfirm, foldClass } from './ui.js';
+import { M_WEEKS } from './marathonplan.js';
 
 // Обновление экрана после изменения данных — назначается в main.js
 let afterChange = () => {};
@@ -13,19 +14,65 @@ export function onDataChange(fn) { afterChange = fn; }
 // v4: + задачи марафона и тема. Старые копии (v3 и без версии) читаются как раньше.
 const BACKUP_VERSION = 4;
 
-$('export-btn').addEventListener('click', () => {
-  const data = {
-    version: BACKUP_VERSION, exportedAt: new Date().toISOString(),
-    habits: state.habits, tasks: state.tasks, marathon: state.marathon,
-    settings: { theme: lsGetString(LTHEME, 'pink'), ui: state.ui },
+// Полная копия: все привычки с историей, все задачи и подзадачи (с выполненными),
+// весь марафон и настройки. Сводка — в начале файла, привычки с длинной историей —
+// в конце, чтобы при просмотре файла на iPhone задачи были видны сразу.
+function buildBackup() {
+  return {
+    app: 'Bloom', version: BACKUP_VERSION, exportedAt: new Date().toISOString(),
     counts: countAll(),
+    tasks: state.tasks, marathon: state.marathon, habits: state.habits,
+    settings: { theme: lsGetString(LTHEME, 'pink'), ui: state.ui },
   };
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
+}
+const backupJSON = () => JSON.stringify(buildBackup(), null, 2);
+const isIOS = () => /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+// На iPhone (особенно в приложении с экрана «Домой») обычное скачивание файла
+// ненадёжно — там используем меню «Поделиться» → «Сохранить в Файлы».
+$('export-btn').addEventListener('click', async () => {
+  const name = `bloom-backup-${today()}.json`;
+  const json = backupJSON();
+  const file = new File([json], name, { type: 'application/json' });
+  if (isIOS() && navigator.canShare && navigator.canShare({ files: [file] })) {
+    try { await navigator.share({ files: [file], title: 'Bloom — резервная копия' }); showToast('💾 Копия сохранена'); return; }
+    catch (e) { if (e && e.name === 'AbortError') return; }
+  }
+  const url = URL.createObjectURL(file);
   const a = document.createElement('a');
-  a.href = url; a.download = `bloom-backup-${today()}.json`;
-  document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+  a.href = url; a.download = name;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
   showToast('💾 Экспортировано!');
+});
+
+// Копия текстом — запасной способ, если с файлом что-то не так: текст можно
+// вставить в «Заметки» или отправить себе, а потом вставить обратно при импорте.
+onAction('export-text', () => {
+  $('text-title').textContent = 'Копия текстом';
+  $('text-hint').textContent = 'Здесь все данные: привычки с историей, задачи и марафон. Скопируй и сохрани, например, в «Заметки».';
+  const ta = $('backup-text'); ta.value = backupJSON(); ta.readOnly = true;
+  $('text-actions').innerHTML = `<button class="mbtn secondary" data-action="close" data-modal="textModal">Закрыть</button><button class="mbtn primary" data-action="copy-text">Скопировать</button>`;
+  SM('textModal');
+});
+onAction('copy-text', async () => {
+  const ta = $('backup-text');
+  try { await navigator.clipboard.writeText(ta.value); showToast('📋 Скопировано'); }
+  catch { ta.focus(); ta.select(); ta.setSelectionRange(0, ta.value.length); showToast(document.execCommand('copy') ? '📋 Скопировано' : 'Выдели текст и скопируй'); }
+});
+onAction('import-text', () => {
+  $('text-title').textContent = 'Импорт из текста';
+  $('text-hint').textContent = 'Вставь сюда текст резервной копии. Данные объединятся с текущими — ничего не удалится.';
+  const ta = $('backup-text'); ta.value = ''; ta.readOnly = false;
+  $('text-actions').innerHTML = `<button class="mbtn secondary" data-action="close" data-modal="textModal">Отмена</button><button class="mbtn primary" data-action="import-text-go">Импортировать</button>`;
+  SM('textModal');
+  setTimeout(() => ta.focus(), 280);
+});
+onAction('import-text-go', () => {
+  try {
+    importBackup(JSON.parse($('backup-text').value), 'текст');
+    CM('textModal');
+  } catch { showToast('❌ Не похоже на копию Bloom'); }
 });
 
 $('import-trigger').addEventListener('click', () => $('import-file').click());
@@ -92,29 +139,32 @@ function mergeById(target, list, normalize) {
 const LSNAP = 'bloom_snapshot_before_import';
 let lastReport = null;
 
+function importBackup(data, sourceName) {
+  if (!data || typeof data !== 'object' || (!Array.isArray(data.habits) && !Array.isArray(data.tasks) && !Array.isArray(data.marathon))) throw new Error('bad backup');
+  lsSave(LSNAP, { at: new Date().toISOString(), habits: state.habits, tasks: state.tasks, marathon: state.marathon });
+  const h = mergeHabits(data.habits);
+  const t = mergeById(state.tasks, data.tasks, normalizeTask);
+  fixParentStatus(state.tasks);
+  // в старых копиях марафона нет — текущие задачи марафона не трогаем
+  const m = Array.isArray(data.marathon) ? mergeById(state.marathon, data.marathon, normalizeMarathonTask) : { added: 0, restored: 0 };
+  saveHabits(); saveTasks(); saveMarathon();
+  const inFile = {
+    habits: validItems(data.habits).length,
+    marks: validItems(data.habits).reduce((s, x) => s + Object.keys(normalizeHistory(x.history)).length, 0),
+    tasks: validItems(data.tasks).length,
+    tasksDone: validItems(data.tasks).filter(x => x.done).length,
+    marathon: validItems(data.marathon).length,
+    date: data.exportedAt ? fmtShortDate(data.exportedAt.slice(0, 10)) + ' ' + data.exportedAt.slice(0, 4) : null,
+  };
+  lastReport = { file: sourceName, inFile, h, t, m, now: countAll() };
+  afterChange(); renderDataScreen();
+  showToast('✅ Данные объединены!');
+}
+
 $('import-file').addEventListener('change', async e => {
   const f = e.target.files[0]; if (!f) return;
-  try {
-    const data = JSON.parse(await f.text());
-    if (!data || typeof data !== 'object') throw new Error('bad file');
-    lsSave(LSNAP, { at: new Date().toISOString(), habits: state.habits, tasks: state.tasks, marathon: state.marathon });
-    const h = mergeHabits(data.habits);
-    const t = mergeById(state.tasks, data.tasks, normalizeTask);
-    fixParentStatus(state.tasks);
-    // в старых копиях марафона нет — текущие задачи марафона не трогаем
-    const m = Array.isArray(data.marathon) ? mergeById(state.marathon, data.marathon, normalizeMarathonTask) : { added: 0, restored: 0 };
-    saveHabits(); saveTasks(); saveMarathon();
-    const inFile = {
-      habits: validItems(data.habits).length,
-      marks: validItems(data.habits).reduce((s, x) => s + Object.keys(normalizeHistory(x.history)).length, 0),
-      tasks: validItems(data.tasks).length,
-      tasksDone: validItems(data.tasks).filter(x => x.done).length,
-      date: data.exportedAt ? fmtShortDate(data.exportedAt.slice(0, 10)) + ' ' + data.exportedAt.slice(0, 4) : null,
-    };
-    lastReport = { file: f.name, inFile, h, t, m, now: countAll() };
-    afterChange(); renderDataScreen();
-    showToast('✅ Данные объединены!');
-  } catch { showToast('❌ Ошибка импорта'); }
+  try { importBackup(JSON.parse(await f.text()), f.name); }
+  catch { showToast('❌ Ошибка импорта'); }
   e.target.value = '';
 });
 
@@ -136,11 +186,11 @@ function reportHTML() {
   const snap = lsLoad(LSNAP, null);
   if (!r) return snap ? `<button class="mbtn secondary diag-undo" data-action="undo-import">↩︎ Отменить последний импорт</button>` : '';
   return `<div class="import-report">
-    <b>Импорт из «${esc(r.file)}»${r.inFile.date ? ` (копия от ${r.inFile.date})` : ''}</b>
-    <div>В файле: привычек ${r.inFile.habits}, отметок ${r.inFile.marks}, задач ${r.inFile.tasks} (выполнено ${r.inFile.tasksDone})</div>
+    <b>Импорт: ${esc(r.file)}${r.inFile.date ? ` (копия от ${r.inFile.date})` : ''}</b>
+    <div>В копии: привычек ${r.inFile.habits}, отметок ${r.inFile.marks}, задач ${r.inFile.tasks} (выполнено ${r.inFile.tasksDone}), марафон ${r.inFile.marathon}</div>
     <div>Добавлено: привычек ${r.h.added}, отметок ${r.h.marks}, задач ${r.t.added}${r.m.added ? `, задач марафона ${r.m.added}` : ''}</div>
     ${r.t.restored || r.m.restored ? `<div>Восстановлено выполненных задач: ${r.t.restored + r.m.restored}</div>` : ''}
-    <div>Теперь в приложении: привычек ${r.now.habits}, отметок ${r.now.marks}, задач ${r.now.tasks} (выполнено ${r.now.tasksDone})</div>
+    <div>Теперь в приложении: привычек ${r.now.habits}, отметок ${r.now.marks}, задач ${r.now.tasks} (выполнено ${r.now.tasksDone}), марафон ${r.now.marathon}</div>
     <button class="mbtn secondary diag-undo" data-action="undo-import">↩︎ Отменить этот импорт</button>
   </div>`;
 }
@@ -166,12 +216,29 @@ function findLegacyHabits() {
   return found;
 }
 
+// Сворачиваемый список на экране «Мои данные»
+function dataFold(key, title, count, body) {
+  return `<section class="fold data-fold${foldClass(key)}">
+    <button class="fold-head" data-action="fold" data-key="${key}"><span class="fold-title">${title}</span><span class="chev"></span><span class="fold-count">${count}</span></button>
+    <div class="fold-body"><div class="fold-inner"><div class="diag-list">${body}</div></div></div>
+  </section>`;
+}
+const status = t => t.done ? `<span class="diag-st done">✓</span>` : `<span class="diag-st">○</span>`;
+
 export function renderDataScreen() {
-  const rows = state.habits.map(h => {
+  const empty = txt => `<div class="diag-row"><span class="diag-name">${txt}</span></div>`;
+  const habitRows = state.habits.map(h => {
     const keys = Object.keys(h.history).filter(k => h.history[k]).sort();
     const range = keys.length ? `${fmtShortDate(keys[0])} ${keys[0].slice(0,4)} — ${fmtShortDate(keys[keys.length-1])} ${keys[keys.length-1].slice(0,4)}` : 'нет отметок';
     return `<div class="diag-row"><span class="diag-name">${esc(h.emoji || '🌸')} ${esc(h.name)}</span><span class="diag-val">${keys.length} · ${range}</span></div>`;
-  }).join('') || `<div class="diag-row"><span class="diag-name">Привычек пока нет</span></div>`;
+  }).join('') || empty('Привычек пока нет');
+
+  const roots = state.tasks.filter(t => !t.parentId);
+  const orphans = state.tasks.filter(t => t.parentId && !state.tasks.some(p => p.id === t.parentId));
+  const taskRow = (t, sub) => `<div class="diag-row${sub ? ' sub' : ''}">${status(t)}<span class="diag-name">${sub ? '↳ ' : ''}${esc(t.text)}</span><span class="diag-val">${t.done && t.doneAt ? fmtShortDate(t.doneAt) : t.dueDate ? fmtShortDate(t.dueDate) : ''}</span></div>`;
+  const taskRows = [...roots.map(r => taskRow(r, false) + state.tasks.filter(s => s.parentId === r.id).map(s => taskRow(s, true)).join('')), ...orphans.map(s => taskRow(s, true))].join('') || empty('Задач пока нет');
+
+  const mRows = state.marathon.map(t => `<div class="diag-row">${status(t)}<span class="diag-name">${esc(t.text)}</span><span class="diag-val">${t.week ? `неделя ${t.week} · ${M_WEEKS[t.week-1].label}` : 'входящие'}</span></div>`).join('') || empty('Задач марафона пока нет');
 
   const legacy = findLegacyHabits();
   const legacyHTML = legacy.length ? `
@@ -184,10 +251,11 @@ export function renderDataScreen() {
   const c = countAll();
   $('data-diag').innerHTML = `
     ${reportHTML()}
-    <div class="mlbl">Сейчас на этом устройстве</div>
-    <div class="diag-sum">Привычек ${c.habits} · отметок ${c.marks} · задач ${c.tasks} (выполнено ${c.tasksDone}) · марафон ${c.marathon}</div>
-    <div class="mlbl">История привычек</div>
-    <div class="diag-list">${rows}</div>
+    <div class="mlbl">Что войдёт в резервную копию</div>
+    <div class="diag-sum">Привычек ${c.habits} · отметок ${c.marks}<br>Задач и подзадач ${c.tasks} · выполнено ${c.tasksDone}<br>Марафон ${c.marathon} · выполнено ${c.marathonDone}</div>
+    ${dataFold('data.habits', 'Привычки и отметки', c.marks, habitRows)}
+    ${dataFold('data.tasks', 'Задачи', `${c.tasksDone}/${c.tasks}`, taskRows)}
+    ${dataFold('data.marathon', 'Марафон', `${c.marathonDone}/${c.marathon}`, mRows)}
     ${legacyHTML}
     <p class="diag-note">⚠️ На iPhone у Safari и у каждой иконки на экране «Домой» отдельные данные, а при удалении иконки её данные стираются. Если отметок не хватает — открой Bloom там, где отмечала (например, со старой иконки), сделай экспорт и импортируй файл здесь.</p>`;
 }
