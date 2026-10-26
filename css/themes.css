@@ -1,0 +1,88 @@
+/* ══════════════════════════════════════════
+   ТЕМЫ — розовая задана по умолчанию в base.css (:root)
+   ══════════════════════════════════════════ */
+
+:root[data-theme="light"] {
+  --accent-rgb:   94,124,226;
+  --accent3-rgb:  150,110,220;
+  --accent3:      #7a55c8;
+  --shadow-rgb:   70,85,120;
+  --ink-rgb:      22,28,45;
+  --muted-rgb:    160,168,185;
+  --glass-border: rgba(255,255,255,0.9);
+  --glass-hi:     rgba(255,255,255,0.95);
+  --modal-bg:     rgba(252,253,255,0.97);
+  --grad-btn:      linear-gradient(135deg, #6f8cf0 0%, #5468d8 100%);
+  --grad-tab:      linear-gradient(135deg, #6f8cf0 0%, #8a7cf0 100%);
+  --grad-progress: linear-gradient(90deg, #6f8cf0, #8a7cf0);
+  --bg-1: #f7f9fd; --bg-2: #cfd8e8; --bg-3: #e2e8f2;
+  --bg-top: #eef1f7; --bg-mid: #e3e8f0; --bg-bot: #d6dde9;
+  --pink-dark: #2f3a66;
+  --pink-mid:  #4a63c8;
+  --text1: #1d2333;
+  --text2: #4b5468;
+  --text3: #8a93a6;
+}
+
+:root[data-theme="dark"] {
+  --accent-rgb:   240,130,190;
+  --accent3-rgb:  180,150,255;
+  --accent3:      #c2a8ff;
+  --surface-rgb:  44,35,54;
+  --shadow-rgb:   0,0,0;
+  --ink-rgb:      8,5,12;
+  --muted-rgb:    130,115,135;
+  --glass-border: rgba(255,255,255,0.09);
+  --glass-hi:     rgba(255,255,255,0.06);
+  --modal-bg:     rgba(34,27,42,0.98);
+  --grad-btn:      linear-gradient(135deg, #e86aa8 0%, #c2508e 100%);
+  --grad-tab:      linear-gradient(135deg, #e86aa8 0%, #b06ad0 100%);
+  --grad-progress: linear-gradient(90deg, #e86aa8, #b06ad0);
+  --bg-1: #3a2140; --bg-2: #2a1d3c; --bg-3: #2e1a2c;
+  --bg-top: #1d1522; --bg-mid: #18121d; --bg-bot: #120e17;
+  --pink-dark: #a8336e;
+  --pink-mid:  #f29ac6;
+  --text1: #f6ecf3;
+  --text2: #d2bccb;
+  --text3: #9a8596;
+}
+
+:root[data-theme="lilac"] {
+  --accent-rgb:   146,110,174;
+  --accent3-rgb:  200,100,165;
+  --accent3:      #a8478a;
+  --shadow-rgb:   110,80,150;
+  --ink-rgb:      40,25,60;
+  --muted-rgb:    180,165,195;
+  --modal-bg:     rgba(250,246,253,0.97);
+  --grad-btn:      linear-gradient(135deg, #a685c2 0%, #835fa3 100%);
+  --grad-tab:      linear-gradient(135deg, #a685c2 0%, #c49ad6 100%);
+  --grad-progress: linear-gradient(90deg, #a685c2, #c49ad6);
+  --bg-1: #ecdff6; --bg-2: #c4acdc; --bg-3: #dccbec;
+  --bg-top: #e8dcf3; --bg-mid: #d4c1e7; --bg-bot: #c0a8da;
+  --pink-dark: #4f3466;
+  --pink-mid:  #7a5797;
+  --text1: #2d2040;
+  --text2: #5c4873;
+  --text3: #9a86b0;
+}
+
+:root[data-theme="violet"] {
+  --accent-rgb:   115,81,132;
+  --accent3-rgb:  196,95,150;
+  --accent3:      #a3407a;
+  --shadow-rgb:   90,55,110;
+  --ink-rgb:      35,20,50;
+  --muted-rgb:    170,150,180;
+  --modal-bg:     rgba(248,243,251,0.97);
+  --grad-btn:      linear-gradient(135deg, #8a64a0 0%, #634274 100%);
+  --grad-tab:      linear-gradient(135deg, #8a64a0 0%, #a86fa8 100%);
+  --grad-progress: linear-gradient(90deg, #8a64a0, #a86fa8);
+  --bg-1: #e2d4ea; --bg-2: #b195c6; --bg-3: #cdb7da;
+  --bg-top: #ddcfe7; --bg-mid: #c6aed7; --bg-bot: #ad92c3;
+  --pink-dark: #3e2650;
+  --pink-mid:  #694a7c;
+  --text1: #281933;
+  --text2: #533d63;
+  --text3: #8f7a9e;
+}
