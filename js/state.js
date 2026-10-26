@@ -5,14 +5,30 @@ import { LH, LT, LM, LUI, lsLoad, lsSave, lsChanged } from './storage.js';
 
 export const DV_ALL = [1,2,3,4,5,6,0];
 
-// История: { 'YYYY-MM-DD': true }. Приводим к этому виду и старые варианты —
-// массив дат, ключи без ведущих нулей ('2026-9-5') или с временем ('2026-09-05T…').
+// История: { 'YYYY-MM-DD': true }. Старые варианты приводим к этому виду:
+// массив дат, ключи без ведущих нулей ('2026-9-5'), с временем ('2026-09-05T…'),
+// '05.09.2026', метки времени и строки вида 'Sat Sep 05 2026'.
+// Ключ, который не удалось распознать, НЕ отбрасывается — сохраняется как есть.
+const pad2 = n => String(n).padStart(2, '0');
+const ymdLocal = d => `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`;
+function historyKey(key) {
+  const k = String(key).trim();
+  let m = /^(\d{4})-(\d{1,2})-(\d{1,2})/.exec(k);
+  if (m) return `${m[1]}-${pad2(m[2])}-${pad2(m[3])}`;
+  m = /^(\d{1,2})\.(\d{1,2})\.(\d{4})$/.exec(k);
+  if (m) return `${m[3]}-${pad2(m[2])}-${pad2(m[1])}`;
+  if (/^\d{10,13}$/.test(k)) { const d = new Date(k.length === 10 ? +k * 1000 : +k); if (!isNaN(d)) return ymdLocal(d); }
+  if (/[a-z]/i.test(k)) { const d = new Date(k); if (!isNaN(d) && d.getFullYear() > 2000) return ymdLocal(d); }
+  return null;
+}
+const isMarked = v => !(v === false || v === 0 || v == null || v === '' || v === 'false' || v === '0');
 export function normalizeHistory(src) {
   const out = {};
   const put = (key, val) => {
-    const m = /^(\d{4})-(\d{1,2})-(\d{1,2})/.exec(String(key));
-    if (!m || !val) return;
-    out[`${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`] = true;
+    if (!isMarked(val)) return;
+    const k = historyKey(key);
+    if (k) out[k] = true;
+    else out[String(key)] = val;      // неизвестный формат — бережно сохраняем
   };
   if (Array.isArray(src)) src.forEach(k => put(k, true));
   else if (src && typeof src === 'object') Object.entries(src).forEach(([k, v]) => put(k, v));
@@ -32,12 +48,17 @@ export function normalizeMarathonTask(t) {
   return { order: parseInt(t.id)||0, done: false, createdAt: null, ...t, id: String(t.id), text: String(t.text ?? ''), week: w >= 1 && w <= 9 ? w : null };
 }
 
-// Выполненная главная задача не может содержать невыполненные подзадачи
+// Выполненная главная задача не может содержать невыполненные подзадачи.
+// Старая версия позволяла отметить главную задачу, не закрыв подзадачи. Такую
+// задачу пользователь уже выполнил — сохраняем это и закрываем её подзадачи,
+// а не возвращаем задачу в активные.
 export function fixParentStatus(tasks) {
   let changed = false;
   tasks.forEach(p => {
     if (p.parentId || !p.done) return;
-    if (tasks.some(s => s.parentId === p.id && !s.done)) { p.done = false; delete p.doneAt; changed = true; }
+    tasks.forEach(s => {
+      if (s.parentId === p.id && !s.done) { s.done = true; s.doneAt = p.doneAt || s.doneAt; changed = true; }
+    });
   });
   return changed;
 }
